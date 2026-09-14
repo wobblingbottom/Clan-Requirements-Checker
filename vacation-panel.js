@@ -8,7 +8,11 @@ export const VACATION_MODAL = 'vacation:submit';
 export function vacationNotice() {
   return {
     ...brandedMessage('Crazyland clan member vacations.',
-      "**inactive-notices**\n\nIf you'll be inactive for a few days, let the leadership team know by __creating a ticket__ and include how long you expect to be away and, if possible, the reason for your absence."),
+      "If you'll be inactive for a few days, let the leadership team know by __creating a ticket__ using the button below. Include how long you expect to be away and, if possible, the reason for your absence.\n\n"
+      + '**Member commands**\n'
+      + '`/timeoff` — Request days off with a start date (YYYY-MM-DD), number of days (1–365), and optional reason. You can also use the **Create ticket** button.\n'
+      + '`/timeoff-status` — View your requests, approval status, and approved dates.\n\n'
+      + 'Time off must be approved by a Leader or Co-leader before you are excused from donation requirements.'),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
       .setCustomId(VACATION_BUTTON).setLabel('Create ticket').setStyle(ButtonStyle.Danger))],
   };
