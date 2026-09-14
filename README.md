@@ -33,7 +33,7 @@ All command responses and the admin panel are private to the person using them. 
 
 1. Install **Node.js 22.12 or newer**.
 2. Create an application and bot at [Discord Developer Portal](https://discord.com/developers/applications). Enable **Server Members Intent** and **Message Content Intent** on the Bot page.
-3. Invite it to your server with the `bot` and `applications.commands` scopes. Give the bot **View Channels**, **Read Message History**, **Add Reactions**, **Send Messages**, **Attach Files**, and **Manage Nicknames**. Check channel overrides in the donation channel and channels where commands are used.
+3. Invite it to your server with the `bot` and `applications.commands` scopes. Give the bot **View Channels**, **Read Message History**, **Add Reactions**, **Send Messages**, **Attach Files**, **Embed Links**, and **Manage Nicknames**. Check channel overrides in the donation channel and channels where commands are used.
 4. Move the bot's highest role **above the highest role of every Patient member whose nickname it must edit**. Discord does not allow the bot to rename the server owner or members above/equal to its role. The admin panel reports these failures; eligible members still appear in reminder lists.
 5. Enable Discord Developer Mode, then copy your server ID and donation text-channel ID. Patient role ID `1532826238572298451` is already set in `state.js`; any old `CLAN_ROLE_ID` setting is ignored.
 6. Copy `.env.example` to `.env`, then set `DISCORD_TOKEN`, `GUILD_ID`, and `DONATION_CHANNEL_ID`. Keep the token private. Set `TIMEZONE` before first launch if the clan uses a timezone other than Europe/Paris.
@@ -51,6 +51,12 @@ Keep the process running for automatic checks. Run **only one instance** for thi
 Deploy this repository as a Railway service and use `npm start`. The local `.env` file is optional; on Railway, set `DISCORD_TOKEN`, `GUILD_ID`, `DONATION_CHANNEL_ID=1535655837828382740`, and `TIMEZONE=Europe/Paris` in the service's Variables tab. Do not upload `.env` to GitHub.
 
 Attach a persistent volume at `/app/data` before starting the bot, keep one replica, and leave the HTTP healthcheck path empty. The bot has no web server and needs no public domain. After deployment, check logs for `Ready: Patient daily checks in Europe/Paris.`
+
+## Message appearance
+
+All bot replies and reminders use Crazyland embeds with colour `#f45f77`, an author header and a footer. The admin panel keeps its buttons and reports keep their downloadable lists. Reminder mentions appear above the embed so they can notify the missing members.
+
+The author and footer icons load from `assets/author-icon.png` and `assets/footer-icon.png` when present and are attached directly to each message. Otherwise you can set `EMBED_AUTHOR_ICON_URL` and `EMBED_FOOTER_ICON_URL` to direct public image URLs in Railway Variables. Missing icons are omitted. The bot needs **Embed Links** permission in the donation channel.
 
 ## Storage, recovery and limits
 

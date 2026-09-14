@@ -5,6 +5,7 @@ import { PATIENT_ROLE_ID, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
 import { commands, panel, modal, timeoffList, file, clean } from './panel.js';
 import { checkAccess } from './access.js';
+import { brandedMessage } from './messages.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
 const timezone = process.env.TIMEZONE || 'Europe/Paris';
@@ -62,7 +63,7 @@ async function handleAdminSubmit(interaction, action) {
     store.revoke(get('id'), interaction.user.id);
     response = 'Days off revoked. Daily checks apply again unless another approved period covers the member.';
   } else throw new Error('Unknown admin action.');
-  await interaction.editReply({ content: `${response}\nNickname changes apply on the next check. Previously sent reminders cannot be withdrawn.`, allowedMentions: { parse: [] } });
+  await interaction.editReply(brandedMessage('Time off updated', `${response}\n\nNickname changes apply on the next check. Previously sent reminders cannot be withdrawn.`));
   schedule();
 }
 
@@ -74,7 +75,7 @@ client.once(Events.ClientReady, async () => {
     if (!await guild.roles.fetch(PATIENT_ROLE_ID)) throw new Error('Patient role 1532826238572298451 not found in this server.');
     const me = await guild.members.fetchMe();
     const permissions = channel.permissionsFor(me);
-    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'AddReactions', 'SendMessages', 'AttachFiles']) {
+    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'AddReactions', 'SendMessages', 'AttachFiles', 'EmbedLinks']) {
       if (!permissions?.has(PermissionFlagsBits[permission])) throw new Error(`Missing donation channel permission: ${permission}`);
     }
     if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
@@ -126,10 +127,20 @@ client.on(Events.InteractionCreate, async interaction => {
         dateRange(start, days);
         if (start < today()) throw new Error('Requests must start today or later. Ask an admin for a retroactive exemption.');
         const request = store.request(interaction.user.id, start, days, interaction.options.getString('reason') || '');
-        return interaction.editReply(`Request **${request.id}** submitted for **${request.start} through ${request.end}** (${days} days). An admin must approve it before you are excused. Use /timeoff-status to check.`);
+        return interaction.editReply(brandedMessage('Time-off request submitted',
+          'Your request is waiting for an administrator. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
+            fields: [
+              { name: 'Dates', value: `${request.start} through ${request.end}` },
+              { name: 'Days off', value: String(days), inline: true },
+              { name: 'Request ID', value: request.id, inline: true },
+            ],
+          }));
       }
       if (interaction.commandName === 'timeoff-status') {
-        return interaction.editReply({ content: 'Your time-off requests and approved dates are attached.', files: [file(timeoffList(store, today(), timezone, interaction.user.id), 'my-time-off.txt')] });
+        return interaction.editReply(brandedMessage('Your days off',
+          'Your requests and approved dates are attached. Pending requests still need admin approval.', {
+            files: [file(timeoffList(store, today(), timezone, interaction.user.id), 'my-time-off.txt')],
+          }));
       }
       const day = interaction.options.getString('date') || today();
       if (!validDay(day) || day > today() || day < '2015-01-01') throw new Error('Use a real YYYY-MM-DD date from 2015 through today.');
@@ -143,14 +154,19 @@ client.on(Events.InteractionCreate, async interaction => {
         '', `MISSING (${report.missing.length})`, ...report.missing.map(label),
         '', `EXCUSED (${report.excused.length})`, ...report.excused.map(label),
       ].join('\n');
-      return interaction.editReply({
-        content: `**${day} · ${timezone}**\nSubmitted: **${report.submitted.length}** · Missing: **${report.missing.length}** · Excused: **${report.excused.length}**\nPatient members: ${report.roster.length}. Details attached.`,
+      return interaction.editReply(brandedMessage('Daily donation report',
+        `**${day}** · ${timezone}\nTracking **${report.roster.length}** Patient members.\nFull member lists and screenshot links are attached.${day === today() ? '\n\nToday is still in progress.' : ''}`, {
+        fields: [
+          { name: 'Submitted', value: String(report.submitted.length), inline: true },
+          { name: 'Missing proof', value: String(report.missing.length), inline: true },
+          { name: 'Excused', value: String(report.excused.length), inline: true },
+        ],
         files: [file(text, `donations-${day}.txt`)],
-      });
+      }));
     });
   } catch (error) {
     console.error('Interaction failed:', error.message);
-    const payload = { content: `Could not complete this action: ${error.message}`.slice(0, 1900), allowedMentions: { parse: [] } };
+    const payload = brandedMessage('Unable to complete this action', String(error.message).slice(0, 1900));
     try {
       if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
       else await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });

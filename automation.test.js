@@ -97,7 +97,8 @@ function fakeAutomation(t, store) {
     send: async payload => {
       const id = String(sent.length + 1);
       sent.push(payload);
-      history.set(id, { id, author: { id: 'bot' }, content: payload.content, createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
+      history.set(id, { id, author: { id: 'bot' }, content: payload.content,
+        embeds: payload.embeds?.map(embed => embed.toJSON()), createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
       return { id };
     },
   };
@@ -117,6 +118,8 @@ test('midnight closes the previous local day once and skips pre-install days', a
   assert.deepEqual(dates, ['2026-09-14']);
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].allowedMentions, { parse: [], users: ['a'] });
+  assert.equal(sent[0].content, '<@a>');
+  assert.equal(sent[0].embeds[0].toJSON().color, 0xf45f77);
   assert.equal(store.data.lastClosedDay, '2026-09-14');
 });
 test('exempt and submitted Patients are excluded from actual reminder mentions', async t => {
@@ -166,6 +169,27 @@ test('unsent retry rechecks newly approved days off', async t => {
   reminder.send = realSend;
   await automation.closeDay('2026-09-14');
   assert.equal(sent.length, 0);
+});
+
+test('upgrading to embeds still recognizes an interrupted legacy plain-text reminder', async t => {
+  const store = makeStore(t);
+  const { automation, sent, history } = fakeAutomation(t, store);
+  automation.report = async () => ({ missing: [member('a')] });
+  history.set('old', { id: 'old', author: { id: 'bot' },
+    content: '<@a>\n[donation-reminder:2026-09-14:0]', createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
+  await automation.closeDay('2026-09-14');
+  assert.equal(sent.length, 0);
+});
+
+test('another user copying the reminder embed cannot suppress the actual bot reminder', async t => {
+  const store = makeStore(t);
+  const { automation, sent, history } = fakeAutomation(t, store);
+  automation.report = async () => ({ missing: [member('a')] });
+  history.set('copy', { id: 'copy', author: { id: 'other' }, content: '<@a>',
+    embeds: [{ title: 'Donation proof reminder', footer: { text: 'Crazyland • 2026-09-14 • Reminder 1' } }],
+    createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
+  await automation.closeDay('2026-09-14');
+  assert.equal(sent.length, 1);
 });
 test('large missing lists are split below Discord message and mention limits', async t => {
   const store = makeStore(t);

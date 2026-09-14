@@ -1,6 +1,7 @@
 import { dayAt, collectSubmissions } from './tracking.js';
 import { classify, shiftDay, taggedName, TAG } from './state.js';
 import { createHash } from 'node:crypto';
+import { reminderMessage, reminderFooter } from './messages.js';
 
 export async function syncNickname(member, missing, store) {
   let record = store.data.nicknames[member.id];
@@ -30,13 +31,15 @@ export async function syncNickname(member, missing, store) {
 
 // Check history before retrying an interrupted send, to avoid duplicate reminders
 // after a crash between Discord accepting a message and the local state save.
-async function findReminder(channel, marker, since, botId) {
+async function findReminder(channel, marker, footer, since, botId) {
   let before;
   for (let page = 0; page < 100; page++) {
     const messages = await channel.messages.fetch({ limit: 100, before, cache: false });
     if (!messages.size) return null;
     for (const message of messages.values()) {
-      if (message.author.id === botId && message.content.includes(marker)) return message.id;
+      // Support both old plain messages and new branded embeds after upgrades.
+      if (message.author.id === botId && (message.content?.includes(marker)
+          || message.embeds?.some(embed => embed.title === 'Donation proof reminder' && embed.footer?.text === footer))) return message.id;
     }
     if (Math.min(...[...messages.values()].map(m => m.createdTimestamp)) < since || messages.size < 100) return null;
     before = [...messages.keys()].reduce((a, b) => BigInt(a) < BigInt(b) ? a : b);
@@ -88,7 +91,7 @@ export class Automation {
     for (const [index, batch] of job.batches.entries()) {
       if (batch.sent) continue;
       const marker = `[donation-reminder:${day}:${index}]`;
-      const existing = await findReminder(this.reminder, marker, job.createdAt - 60000, this.botId);
+      const existing = await findReminder(this.reminder, marker, reminderFooter(day, index), job.createdAt - 60000, this.botId);
       if (existing) {
         batch.sent = existing;
         this.store.save();
@@ -98,8 +101,8 @@ export class Automation {
       if (ids.length) {
         const nonce = createHash('sha256').update(`${this.guild.id}:${day}:${index}`).digest('hex').slice(0, 24);
         const message = await this.reminder.send({
-          content: `No donation proof was posted for **${day}** (${this.timezone}) in <#${this.channel.id}>.\n${ids.map(id => `<@${id}>`).join(' ')}\n${marker}`,
-          allowedMentions: { parse: [], users: ids }, nonce, enforceNonce: true,
+          ...reminderMessage(day, this.timezone, this.channel.id, ids, index),
+          nonce, enforceNonce: true,
         });
         batch.sent = message.id;
       } else batch.sent = 'skipped';

@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits, AttachmentBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { PATIENT_ROLE_ID } from './state.js';
+import { brandedMessage } from './messages.js';
 
 export const commands = [
   new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
@@ -32,11 +33,18 @@ export function panel(store, automation, today, timezone) {
     ['approve', 'Approve request'], ['reject', 'Reject request'], ['revoke', 'Revoke days off'] ];
   const errors = [...automation.nicknameErrors, ...(automation.lastError ? [automation.lastError] : [])];
   return {
-    content: `**Donation admin panel**\nPatient role: <@&${PATIENT_ROLE_ID}>\nDaily timezone: ${timezone}\nPending requests: **${pending}**\nLast check: ${automation.lastCheck || 'Starting'}\nChecks run every minute. Review the attached list for request/grant IDs.\n${errors.length ? `**${errors.length} automation issue(s)** — see issues.txt.` : ''}`,
+    ...brandedMessage('Donation admin panel',
+      `Manage time-off requests and donation requirements below.\nChecks run every minute. Request and grant IDs are in the attached list.${errors.length ? `\n\n**${errors.length} automation issue(s)** — see issues.txt.` : ''}`, {
+        fields: [
+          { name: 'Tracked members', value: `<@&${PATIENT_ROLE_ID}>`, inline: true },
+          { name: 'Pending requests', value: String(pending), inline: true },
+          { name: 'Timezone', value: timezone, inline: true },
+          { name: 'Last check', value: automation.lastCheck || 'Starting' },
+        ],
+        files: [file(timeoffList(store, today, timezone), 'time-off.txt'), ...(errors.length ? [file(errors.join('\n'), 'issues.txt')] : [])],
+      }),
     components: [new ActionRowBuilder().addComponents(buttons.map(([action, label]) =>
       new ButtonBuilder().setCustomId(`admin:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary)))],
-    files: [file(timeoffList(store, today, timezone), 'time-off.txt'), ...(errors.length ? [file(errors.join('\n'), 'issues.txt')] : [])],
-    allowedMentions: { parse: [] },
   };
 }
 export function modal(action, today) {
