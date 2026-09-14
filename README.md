@@ -46,6 +46,12 @@ All command responses and the admin panel are private to the person using them. 
 
 Keep the process running for automatic checks. Run **only one instance** for this server. Stop it with Ctrl+C. Slash commands are registered for the configured server on startup. No separate web dashboard is needed.
 
+## Railway
+
+Deploy this repository as a Railway service and use `npm start`. The local `.env` file is optional; on Railway, set `DISCORD_TOKEN`, `GUILD_ID`, `DONATION_CHANNEL_ID=1535655837828382740`, and `TIMEZONE=Europe/Paris` in the service's Variables tab. Do not upload `.env` to GitHub.
+
+Attach a persistent volume at `/app/data` before starting the bot, keep one replica, and leave the HTTP healthcheck path empty. The bot has no web server and needs no public domain. After deployment, check logs for `Ready: Patient daily checks in Europe/Paris.`
+
 ## Storage, recovery and limits
 
 - `data/state.json` stores requests, grants, original nicknames and reminder progress. It is created on first startup and excluded from Git. **Keep this folder on persistent storage and back it up**. Writes replace the file atomically. Corrupt state causes startup to fail rather than silently forgetting exemptions or nickname originals.
