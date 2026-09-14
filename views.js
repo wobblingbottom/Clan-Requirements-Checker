@@ -63,7 +63,7 @@ export function issueBlocks(automation) {
 }
 
 export function timeoffView(store, today, timezone, userId, page = 0) {
-  return listMessage('Your days off', `${timezone} · Start and end dates are inclusive.\nPending requests need admin approval.`,
+  return listMessage('Crazyland clan member vacations.', `${timezone} · Start and end dates are inclusive.\nPending requests need admin approval.`,
     timeoffBlocks(store, today, userId), page, 'timeoff-page');
 }
 
@@ -71,7 +71,7 @@ export function timeoffRequestNotice(request, decision, adminId) {
   const status = decision
     ? `${decision === 'approved' ? 'Approved' : 'Rejected'} by <@${adminId}>`
     : 'Waiting for administrator review';
-  const message = brandedMessage('New time-off request',
+  const message = brandedMessage('Crazyland clan vacation request.',
     `<@${request.userId}> requested time off.`, {
       fields: [
         { name: 'Dates', value: `${request.start} through ${request.end}` },
@@ -97,7 +97,7 @@ export function donationView(report, day, today, timezone, page = 0) {
     ...(report.missing.length ? report.missing.map(m => `**Missing proof** · <@${m.id}>`) : ['**Missing proof**\nNobody is missing proof.']),
     ...(report.excused.length ? report.excused.map(m => `**Excused** · <@${m.id}>`) : ['**Excused**\nNo members on approved days off.']),
   ];
-  return listMessage('Daily donation report', `**${day}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
+  return listMessage('Crazyland clan donation report.', `**${day}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
     blocks, page, `report-page:${day}`, { fields: [
       { name: 'Submitted', value: String(report.submitted.length), inline: true },
       { name: 'Missing proof', value: String(report.missing.length), inline: true },

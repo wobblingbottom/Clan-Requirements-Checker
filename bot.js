@@ -83,7 +83,7 @@ async function handleAdminSubmit(interaction, action) {
     store.revoke(get('id'), interaction.user.id);
     response = 'Days off revoked. Daily checks apply again unless another approved period covers the member.';
   } else throw new Error('Unknown admin action.');
-  await interaction.editReply(brandedMessage('Time off updated', `${response}\n\nNickname changes apply on the next check. Previously sent reminders cannot be withdrawn.`));
+  await interaction.editReply(brandedMessage('Crazyland clan vacation updated.', `${response}\n\nNickname changes apply on the next check. Previously sent reminders cannot be withdrawn.`));
   schedule();
 }
 
@@ -99,7 +99,7 @@ async function handleTimeoffReview(interaction) {
   if (action === 'approve') store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
   else store.reject(request.id, interaction.user.id);
   await interaction.message.edit(timeoffRequestNotice(request, action === 'approve' ? 'approved' : 'rejected', interaction.user.id));
-  await interaction.editReply(brandedMessage(`Request ${action === 'approve' ? 'approved' : 'rejected'}`,
+  await interaction.editReply(brandedMessage(`Crazyland clan vacation ${action === 'approve' ? 'approved' : 'rejected'}.`,
     `<@${request.userId}> has been ${action === 'approve' ? 'excused for the requested dates' : 'kept on the donation requirement'}.`));
   schedule();
 }
@@ -189,10 +189,10 @@ client.on(Events.InteractionCreate, async interaction => {
           store.save();
         } catch (error) {
           console.error(`Could not notify admins about request ${request.id}:`, error.message);
-          return interaction.editReply(brandedMessage('Time-off request saved',
+          return interaction.editReply(brandedMessage('Crazyland clan vacation request saved.',
             `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/donation-admin\`.`));
         }
-        return interaction.editReply(brandedMessage('Time-off request submitted',
+        return interaction.editReply(brandedMessage('Crazyland clan vacation request submitted.',
           'Your request is waiting for an administrator. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
             fields: [
               { name: 'Dates', value: `${request.start} through ${request.end}` },
@@ -211,7 +211,7 @@ client.on(Events.InteractionCreate, async interaction => {
     });
   } catch (error) {
     console.error('Interaction failed:', error.message);
-    const payload = brandedMessage('Unable to complete this action', String(error.message).slice(0, 1900));
+    const payload = brandedMessage('Crazyland clan bot notice.', String(error.message).slice(0, 1900));
     try {
       if (interaction.deferred || interaction.replied) await interaction.editReply({ ...payload, attachments: [], components: [] });
       else await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });

@@ -23,7 +23,7 @@ function adminButtons() {
 
 export function panel(store, automation, today, timezone) {
   const pending = Object.values(store.data.requests).filter(r => r.status === 'pending').length;
-  const message = listMessage('Donation admin panel',
+  const message = listMessage('Crazyland clan donation admin.',
       'Manage donation requirements and time off with the buttons below.',
       [...issueBlocks(automation), ...timeoffBlocks(store, today)], 0, 'admin:page', {
         fields: [
@@ -35,7 +35,7 @@ export function panel(store, automation, today, timezone) {
 }
 
 export function adminTimeoffView(store, today, timezone, page = 0) {
-  const message = listMessage('Requests & days off',
+  const message = listMessage('Crazyland clan member vacations.',
     `${timezone} · Start and end dates are inclusive. Pending requests still need approval.`,
     timeoffBlocks(store, today), page, 'admin:page');
   message.components.unshift(adminButtons());

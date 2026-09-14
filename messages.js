@@ -29,11 +29,13 @@ export function brandedMessage(title, description, options = {}) {
   const files = [...(options.files || [])];
   const authorIcon = icon('author', files);
   const footerIcon = icon('footer', files);
+  const thumbnailIcon = options.thumbnail === false ? undefined : icon('thumbnail', files) || footerIcon;
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
     .setAuthor({ name: title, ...(authorIcon ? { iconURL: authorIcon } : {}) })
     .setDescription(description)
     .setFooter({ text: BRAND_FOOTER, ...(footerIcon ? { iconURL: footerIcon } : {}) });
+  if (thumbnailIcon) embed.setThumbnail(thumbnailIcon);
   if (options.fields?.length) embed.addFields(options.fields);
   return {
     content: options.content || '', embeds: [embed], files,
@@ -46,6 +48,7 @@ export function reminderMessage(day, timezone, ids) {
       // Discord only notifies mentions in message content, not inside embeds.
       content: `Missing donation proof for **${day}** (${timezone}):\n${ids.map(id => `<@${id}>`).join(' ')}`,
       mentionUsers: ids,
+      thumbnail: false,
     });
 }
 

@@ -2,15 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { brandedMessage, reminderMessage, matchesReminder } from './messages.js';
 
-test('branded replies serialize as pink embeds and do not allow accidental pings', () => {
-  const message = brandedMessage('Time off updated', 'Approved for <@123> @everyone');
+test('branded replies serialize with the shared layout and do not allow accidental pings', () => {
+  const message = brandedMessage('Crazyland clan vacation updated.', 'Approved for <@123> @everyone');
   const embed = message.embeds[0].toJSON();
   assert.equal(embed.color, 0xf45f77);
-  assert.equal(embed.author.name, 'Time off updated');
+  assert.equal(embed.author.name, 'Crazyland clan vacation updated.');
   assert.equal(embed.title, undefined);
   assert.equal(embed.footer.text, 'Crazyland Asylum');
   assert.equal(message.content, '');
   assert.deepEqual(message.allowedMentions, { parse: [] });
+});
+
+test('large embeds use hand, thumbnail, and footer icons in the reference positions', () => {
+  process.env.EMBED_AUTHOR_ICON_URL = 'https://example.com/hand.png';
+  process.env.EMBED_FOOTER_ICON_URL = 'https://example.com/footer.png';
+  process.env.EMBED_THUMBNAIL_ICON_URL = 'https://example.com/wide-logo.png';
+  try {
+    const embed = brandedMessage('Crazyland clan donation info.', 'Donation information.').embeds[0].toJSON();
+    assert.equal(embed.author.icon_url, 'https://example.com/hand.png');
+    assert.equal(embed.thumbnail.url, 'https://example.com/wide-logo.png');
+    assert.equal(embed.footer.icon_url, 'https://example.com/footer.png');
+  } finally {
+    delete process.env.EMBED_AUTHOR_ICON_URL;
+    delete process.env.EMBED_FOOTER_ICON_URL;
+    delete process.env.EMBED_THUMBNAIL_ICON_URL;
+  }
 });
 
 test('reminder content contains actual mentions and the embed stays within Discord limits', () => {
@@ -25,6 +41,7 @@ test('reminder content contains actual mentions and the embed stays within Disco
   assert.equal(embed.author.name, 'Crazyland clan donation reminder.');
   assert.equal(embed.description, "Don't forget to donate your daily!");
   assert.equal(embed.footer.text, 'Crazyland Asylum');
+  assert.equal(embed.thumbnail, undefined);
 });
 
 test('simple reminders are recovered only for the matching date and member batch', () => {
