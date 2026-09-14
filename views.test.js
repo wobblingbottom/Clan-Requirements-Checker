@@ -16,19 +16,22 @@ const noTextCards = message => {
   assert.ok(total <= 6000);
 };
 
-test('admin command opens a clean control panel without lists, files, or error details', () => {
+test('admin command shows inline details but omits tracked members, timezone, and last check fields', () => {
   const bot = automation();
   bot.nicknameErrors.push('Cannot edit nickname for 641307116677758976: check Manage Nicknames and role hierarchy.');
   const message = panel(state(), bot, '2026-09-14', 'Europe/Paris');
   noTextCards(message);
   const embed = message.embeds[0].toJSON();
-  assert.doesNotMatch(embed.description, /No time-off requests yet/);
-  assert.doesNotMatch(embed.description, /641307116677758976/);
-  assert.doesNotMatch(embed.description, /Manage Nicknames/);
+  assert.match(embed.description, /No time-off requests yet/);
+  assert.match(embed.description, /No days off granted yet/);
+  assert.match(embed.description, /<@641307116677758976>/);
+  assert.match(embed.description, /Manage Nicknames/);
+  assert.deepEqual(embed.fields, [{ name: 'Pending requests', value: '0', inline: true }]);
+  assert.ok(!embed.fields.some(field => ['Tracked members', 'Timezone', 'Last check'].includes(field.name)));
   assert.equal(message.components[0].toJSON().components.length, 5);
 });
 
-test('requests and grants appear only after the admin list button is used', () => {
+test('admin list button provides the requests and grants view', () => {
   const store = state();
   store.data.requests.abc = { id: 'abc', userId: '123', status: 'pending', start: '2026-09-14', end: '2026-09-15', days: 2, reason: 'Away' };
   const message = adminTimeoffView(store, '2026-09-14', 'Europe/Paris');

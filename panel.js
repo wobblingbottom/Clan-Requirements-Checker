@@ -1,8 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { PATIENT_ROLE_ID } from './state.js';
-import { brandedMessage } from './messages.js';
-import { listMessage, timeoffBlocks } from './views.js';
+import { listMessage, timeoffBlocks, issueBlocks } from './views.js';
 
 export const commands = [
   new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
@@ -25,17 +23,14 @@ function adminButtons() {
 
 export function panel(store, automation, today, timezone) {
   const pending = Object.values(store.data.requests).filter(r => r.status === 'pending').length;
-  const message = brandedMessage('Donation admin panel',
-      'Manage donation requirements and time off with the buttons below. Checks run every minute.', {
+  const message = listMessage('Donation admin panel',
+      'Manage donation requirements and time off with the buttons below.',
+      [...issueBlocks(automation), ...timeoffBlocks(store, today)], 0, 'admin:page', {
         fields: [
-          { name: 'Tracked members', value: `<@&${PATIENT_ROLE_ID}>`, inline: true },
           { name: 'Pending requests', value: String(pending), inline: true },
-          { name: 'Timezone', value: timezone, inline: true },
-          { name: 'Last check', value: automation.lastCheck || 'Starting' },
         ],
       });
-  message.attachments = [];
-  message.components = [adminButtons()];
+  message.components.unshift(adminButtons());
   return message;
 }
 
