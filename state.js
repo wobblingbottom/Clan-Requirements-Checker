@@ -4,10 +4,18 @@ import { randomUUID } from 'node:crypto';
 import { validDay } from './tracking.js';
 
 export const PATIENT_ROLE_ID = '1532826238572298451';
+export const TIMEOFF_ROLE_IDS = [
+  PATIENT_ROLE_ID,
+  '1532826140086112256',
+  '1532826772624769316',
+  '1532826889499185302',
+];
 export const TAG = '[No Donation Proof]';
 export const shiftDay = (day, offset) => new Date(Date.parse(`${day}T12:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
 export const isExcused = (state, userId, day) => Object.values(state.grants)
   .some(g => g.userId === userId && !g.revokedAt && g.start <= day && day <= g.end);
+export const canRequestTimeoff = member => !member.user.bot
+  && TIMEOFF_ROLE_IDS.some(roleId => member.roles.cache.has(roleId));
 
 export function dateRange(start, days) {
   if (!validDay(start) || !Number.isInteger(days) || days < 1 || days > 365) {

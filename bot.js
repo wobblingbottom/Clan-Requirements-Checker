@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Events, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { fileURLToPath } from 'node:url';
 import { dayAt, validDay, hasImage } from './tracking.js';
-import { PATIENT_ROLE_ID, Store, dateRange } from './state.js';
+import { PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, canRequestTimeoff, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
 import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
@@ -44,6 +44,11 @@ async function patient(userId) {
   if (member.user.bot || !member.roles.cache.has(PATIENT_ROLE_ID)) throw new Error('This member must have the Patient role.');
   return member;
 }
+async function timeoffMember(userId) {
+  const member = await automation.guild.members.fetch(userId);
+  if (!canRequestTimeoff(member)) throw new Error('This member does not have a role that can request time off.');
+  return member;
+}
 async function updateRequestNotice(request, decision, adminId) {
   if (!request.noticeMessageId) return;
   try {
@@ -59,13 +64,13 @@ async function handleAdminSubmit(interaction, action) {
   if (action === 'grant') {
     const userId = get('user');
     if (!/^\d{17,20}$/.test(userId)) throw new Error('Enter the member Discord ID, not their name or a role ID.');
-    await patient(userId);
+    await timeoffMember(userId);
     const grant = store.grant(userId, get('start'), Number(get('days')), interaction.user.id);
     response = `Granted ${grant.days} days off to <@${userId}>: **${grant.start} through ${grant.end}**. Grant ID: ${grant.id}.`;
   } else if (action === 'approve') {
     const request = store.data.requests[get('id')];
     if (!request || request.status !== 'pending') throw new Error('Pending request not found.');
-    await patient(request.userId);
+    await timeoffMember(request.userId);
     const grant = store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
     await updateRequestNotice(request, 'approved', interaction.user.id);
     response = `Approved request ${request.id}: **${grant.start} through ${grant.end}**. Grant ID: ${grant.id}.`;
@@ -90,7 +95,7 @@ async function handleTimeoffReview(interaction) {
   }
   const request = store.data.requests[requestId];
   if (!request || request.status !== 'pending') throw new Error('This request has already been reviewed or no longer exists.');
-  await patient(request.userId);
+  await timeoffMember(request.userId);
   if (action === 'approve') store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
   else store.reject(request.id, interaction.user.id);
   await interaction.message.edit(timeoffRequestNotice(request, action === 'approve' ? 'approved' : 'rejected', interaction.user.id));
@@ -106,7 +111,9 @@ client.once(Events.ClientReady, async () => {
     adminChannel = await guild.channels.fetch(ADMIN_CHANNEL_ID);
     if (channel?.type !== ChannelType.GuildText) throw new Error('Donation channel must be a normal text channel in this server.');
     if (adminChannel?.type !== ChannelType.GuildText) throw new Error('Admin channel 1532826033089151184 must be a normal text channel in this server.');
-    if (!await guild.roles.fetch(PATIENT_ROLE_ID)) throw new Error('Patient role 1532826238572298451 not found in this server.');
+    for (const roleId of TIMEOFF_ROLE_IDS) {
+      if (!await guild.roles.fetch(roleId)) throw new Error(`Configured time-off role ${roleId} was not found in this server.`);
+    }
     const me = await guild.members.fetchMe();
     const permissions = channel.permissionsFor(me);
     for (const permission of ['ViewChannel', 'ReadMessageHistory', 'AddReactions', 'SendMessages', 'AttachFiles', 'EmbedLinks']) {
@@ -170,7 +177,7 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.editReply(adminTimeoffView(store, today(), timezone, page));
       }
       if (interaction.commandName === 'timeoff') {
-        await patient(interaction.user.id);
+        await timeoffMember(interaction.user.id);
         const start = interaction.options.getString('start');
         const days = interaction.options.getInteger('days');
         dateRange(start, days);

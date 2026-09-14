@@ -17,13 +17,13 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 | --- | --- | --- |
 | `/donations` | Manage Server | Today's submitted, missing and excused members, with proof links |
 | `/donations date:2026-09-14` | Manage Server | Report for a previous date |
-| `/timeoff start:2026-09-15 days:3 reason:Holiday` | Patient members | Request September 15–17 inclusive and notify the admin channel |
+| `/timeoff start:2026-09-15 days:3 reason:Holiday` | Members with an allowed time-off role | Request September 15–17 inclusive and notify the admin channel |
 | `/timeoff-status` | Members | View their own requests and approved dates |
 | `/donation-admin` | Administrator | Open the private admin panel |
 
 The `/donation-admin` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
 
-When a Patient submits `/timeoff`, the bot posts a styled request in admin channel `1532826033089151184` with **Approve** and **Reject** buttons. Only server administrators can use them. After a decision, the request message shows who approved or rejected it and the buttons disappear. Manual decisions made through `/donation-admin` also update the matching request message when it is still available.
+Members with role `1532826238572298451`, `1532826140086112256`, `1532826772624769316`, or `1532826889499185302` can submit `/timeoff`. The bot posts a styled request in admin channel `1532826033089151184` with **Approve** and **Reject** buttons. Only server administrators can use them. After a decision, the request message shows who approved or rejected it and the buttons disappear. Manual decisions made through `/donation-admin` also update the matching request message when it is still available. Daily donation checks still track only the Patient role `1532826238572298451`.
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 

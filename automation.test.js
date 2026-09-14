@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Store, PATIENT_ROLE_ID, TAG, dateRange, isExcused, classify, shiftDay, taggedName } from './state.js';
+import { Store, PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, TAG, dateRange, isExcused, canRequestTimeoff, classify, shiftDay, taggedName } from './state.js';
 import { Automation, syncNickname } from './automation.js';
 import { commands, panel, modal } from './panel.js';
 
@@ -44,6 +44,23 @@ test('only Patients are required; pending requests do not excuse, approval does,
   assert.throws(() => store.grant('b', request.start, request.days, 'admin', request.id));
   store.revoke(grant.id, 'admin');
   assert.equal(isExcused(store.data, 'b', '2026-09-14'), false);
+});
+
+test('Patient and three additional roles can request time off without expanding donation tracking', () => {
+  assert.deepEqual(TIMEOFF_ROLE_IDS, [
+    '1532826238572298451', '1532826140086112256', '1532826772624769316', '1532826889499185302',
+  ]);
+  for (const roleId of TIMEOFF_ROLE_IDS) {
+    const m = member(roleId, { role: false });
+    m.roles.cache.set(roleId, {});
+    assert.equal(canRequestTimeoff(m), true);
+    const report = classify(new Map([[m.id, m]]), new Map(), { grants: {} }, '2026-09-14');
+    assert.equal(report.roster.length, roleId === PATIENT_ROLE_ID ? 1 : 0);
+  }
+  assert.equal(canRequestTimeoff(member('none', { role: false })), false);
+  const bot = member('bot', { role: false, bot: true });
+  bot.roles.cache.set(TIMEOFF_ROLE_IDS[1], {});
+  assert.equal(canRequestTimeoff(bot), false);
 });
 test('requests, grants and original nicknames survive restart; malformed state fails closed', t => {
   const store = makeStore(t);
