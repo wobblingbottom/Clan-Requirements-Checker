@@ -10,7 +10,7 @@ export function vacationNotice() {
     ...brandedMessage('Crazyland clan member vacations.',
       "**inactive-notices**\n\nIf you'll be inactive for a few days, let the leadership team know by __creating a ticket__ and include how long you expect to be away and, if possible, the reason for your absence."),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
-      .setCustomId(VACATION_BUTTON).setLabel('Create ticket').setEmoji('📩').setStyle(ButtonStyle.Success))],
+      .setCustomId(VACATION_BUTTON).setLabel('Create ticket').setStyle(ButtonStyle.Danger))],
   };
 }
 

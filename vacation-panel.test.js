@@ -26,7 +26,7 @@ test('notice uses the supplied branding and timeoff form inputs', () => {
   const notice = vacationNotice();
   assert.equal(notice.embeds[0].data.color, 0xf45f77);
   assert.equal(notice.components[0].components[0].data.custom_id, VACATION_BUTTON);
-  assert.equal(notice.components[0].components[0].data.style, 3);
+  assert.equal(notice.components[0].components[0].data.style, 4);
   const inputs = vacationModal('2026-09-14').toJSON().components.map(row => row.components[0]);
   assert.deepEqual(inputs.map(input => input.custom_id), ['start', 'days', 'reason']);
   assert.equal(inputs[0].value, '2026-09-14');
