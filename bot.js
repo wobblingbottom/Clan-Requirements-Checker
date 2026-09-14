@@ -7,6 +7,7 @@ import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
+import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
 const ADMIN_CHANNEL_ID = '1532826033089151184';
@@ -126,6 +127,13 @@ client.once(Events.ClientReady, async () => {
     if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
     store = new Store(fileURLToPath(new URL('./data/state.json', import.meta.url)), today(), GUILD_ID, timezone);
     automation = new Automation({ guild, channel, reminder: channel, store, timezone, botId: client.user.id });
+    const vacationChannel = await guild.channels.fetch(VACATION_CHANNEL_ID);
+    if (vacationChannel?.type !== ChannelType.GuildText) throw new Error('Vacation channel must be a normal text channel.');
+    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'EmbedLinks', 'AttachFiles']) {
+      if (!vacationChannel.permissionsFor(me)?.has(PermissionFlagsBits[permission])) throw new Error(`Missing vacation channel permission: ${permission}`);
+    }
+    await ensureVacationNotice(vacationChannel, store, client.user.id);
+    console.log(`Vacation notice ready in ${VACATION_CHANNEL_ID}.`);
     for (const command of commands) await guild.commands.create(command.toJSON());
     console.log(`Ready: Patient daily checks in ${timezone}. Reminders go to the donation channel.`);
     timer = setInterval(schedule, 60000);
@@ -149,12 +157,21 @@ client.on(Events.MessageCreate, async message => {
 
 client.on(Events.InteractionCreate, async interaction => {
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
-  const isButton = interaction.isButton() && ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix));
+  const isButton = interaction.isButton() && (interaction.customId === VACATION_BUTTON || ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix)));
+  const isVacationSubmit = interaction.isModalSubmit() && interaction.customId === VACATION_MODAL;
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
-  if (!isCommand && !isButton && !isModal) return;
+  if (!isCommand && !isButton && !isModal && !isVacationSubmit) return;
   try {
     if (!automation || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
     checkAccess(interaction, GUILD_ID);
+    if (interaction.customId === VACATION_BUTTON || isVacationSubmit) {
+      if (interaction.channelId !== VACATION_CHANNEL_ID) throw new Error('Use the notice in the member vacations channel.');
+      if (isButton) {
+        if (interaction.message.author.id !== client.user.id) throw new Error('This is not the bot vacation notice.');
+        await interaction.showModal(vacationModal(today()));
+        return;
+      }
+    }
     if (isButton && interaction.customId.startsWith('admin:')
         && interaction.customId !== 'admin:list' && !interaction.customId.startsWith('admin:page:')) {
       const action = interaction.customId.split(':')[1];
@@ -176,13 +193,14 @@ client.on(Events.InteractionCreate, async interaction => {
       if (isButton && (interaction.customId === 'admin:list' || interaction.customId.startsWith('admin:page:'))) {
         return interaction.editReply(adminTimeoffView(store, today(), timezone, page));
       }
-      if (interaction.commandName === 'timeoff') {
+      if (interaction.commandName === 'timeoff' || isVacationSubmit) {
         await timeoffMember(interaction.user.id);
-        const start = interaction.options.getString('start');
-        const days = interaction.options.getInteger('days');
+        const start = isVacationSubmit ? interaction.fields.getTextInputValue('start').trim() : interaction.options.getString('start');
+        const days = isVacationSubmit ? Number(interaction.fields.getTextInputValue('days').trim()) : interaction.options.getInteger('days');
+        const reason = isVacationSubmit ? interaction.fields.getTextInputValue('reason').trim() : interaction.options.getString('reason') || '';
         dateRange(start, days);
         if (start < today()) throw new Error('Requests must start today or later. Ask an admin for a retroactive exemption.');
-        const request = store.request(interaction.user.id, start, days, interaction.options.getString('reason') || '');
+        const request = store.request(interaction.user.id, start, days, reason);
         try {
           const notice = await adminChannel.send(timeoffRequestNotice(request));
           request.noticeMessageId = notice.id;

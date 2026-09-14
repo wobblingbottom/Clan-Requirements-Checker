@@ -13,6 +13,8 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 
 ## Commands and the Discord admin panel
 
+On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its green **Create ticket** button opens a private form with the same values as `/timeoff`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
+
 | Command | Who can use it | Purpose |
 | --- | --- | --- |
 | `/donations` | Manage Server | Today's submitted, missing and excused members, with proof links |
