@@ -13,7 +13,7 @@ test('branded replies serialize with the shared layout and do not allow accident
   assert.deepEqual(message.allowedMentions, { parse: [] });
 });
 
-test('bundled hand and footer images take priority over URLs, with an optional separate thumbnail', () => {
+test('bundled hand, footer and separate thumbnail take priority over URLs', () => {
   process.env.EMBED_AUTHOR_ICON_URL = 'https://example.com/hand.png';
   process.env.EMBED_FOOTER_ICON_URL = 'https://example.com/footer.png';
   process.env.EMBED_THUMBNAIL_ICON_URL = 'https://example.com/wide-logo.png';
@@ -21,9 +21,9 @@ test('bundled hand and footer images take priority over URLs, with an optional s
     const message = brandedMessage('Crazyland clan donation info.', 'Donation information.');
     const embed = message.embeds[0].toJSON();
     assert.equal(embed.author.icon_url, 'attachment://crazyland-author.png');
-    assert.equal(embed.thumbnail.url, 'https://example.com/wide-logo.png');
+    assert.equal(embed.thumbnail.url, 'attachment://crazyland-thumbnail.png');
     assert.equal(embed.footer.icon_url, 'attachment://crazyland-footer.png');
-    assert.deepEqual(message.files.map(file => file.name), ['crazyland-author.png', 'crazyland-footer.png']);
+    assert.deepEqual(message.files.map(file => file.name), ['crazyland-author.png', 'crazyland-footer.png', 'crazyland-thumbnail.png']);
   } finally {
     delete process.env.EMBED_AUTHOR_ICON_URL;
     delete process.env.EMBED_FOOTER_ICON_URL;
