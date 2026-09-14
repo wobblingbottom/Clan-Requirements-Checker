@@ -211,7 +211,7 @@ client.on(Events.InteractionCreate, async interaction => {
             `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/donation-admin\`.`));
         }
         return interaction.editReply(brandedMessage('Crazyland clan vacation request submitted.',
-          'Your request is waiting for an administrator. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
+          'Your request is waiting for a Leader or Co-leader. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
             fields: [
               { name: 'Dates', value: `${request.start} through ${request.end}` },
               { name: 'Days off', value: String(days), inline: true },

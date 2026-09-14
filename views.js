@@ -70,7 +70,7 @@ export function timeoffView(store, today, timezone, userId, page = 0) {
 export function timeoffRequestNotice(request, decision, adminId) {
   const status = decision
     ? `${decision === 'approved' ? 'Approved' : 'Rejected'} by <@${adminId}>`
-    : 'Waiting for administrator review';
+    : 'Waiting for Leader or Co-leader approval';
   const message = brandedMessage('Crazyland clan vacation request.',
     `<@${request.userId}> requested time off.`, {
       fields: [

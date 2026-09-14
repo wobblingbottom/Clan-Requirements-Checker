@@ -106,7 +106,7 @@ test('new time-off request notice has approve and reject buttons without pinging
   noTextCards(message);
   const embed = message.embeds[0].toJSON();
   assert.match(embed.description, /<@12345678901234567>/);
-  assert.equal(embed.fields.find(field => field.name === 'Status').value, 'Waiting for administrator review');
+  assert.equal(embed.fields.find(field => field.name === 'Status').value, 'Waiting for Leader or Co-leader approval');
   assert.deepEqual(message.components[0].toJSON().components.map(button => [button.custom_id, button.style]), [
     ['timeoff-review:approve:abc123', 3],
     ['timeoff-review:reject:abc123', 4],
