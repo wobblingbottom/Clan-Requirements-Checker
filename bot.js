@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dayAt, validDay, hasImage } from './tracking.js';
 import { PATIENT_ROLE_ID, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
-import { commands, panel, modal } from './panel.js';
+import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
@@ -123,8 +123,11 @@ client.on(Events.InteractionCreate, async interaction => {
     await serialize(async () => {
       const page = isButton ? Number(interaction.customId.split(':').at(-1)) || 0 : 0;
       if (isModal) return handleAdminSubmit(interaction, interaction.customId.split(':')[1]);
-      if ((isButton && interaction.customId.startsWith('admin:')) || interaction.commandName === 'donation-admin') {
-        return interaction.editReply(panel(store, automation, today(), timezone, page));
+      if (interaction.commandName === 'donation-admin') {
+        return interaction.editReply(panel(store, automation, today(), timezone));
+      }
+      if (isButton && (interaction.customId === 'admin:list' || interaction.customId.startsWith('admin:page:'))) {
+        return interaction.editReply(adminTimeoffView(store, today(), timezone, page));
       }
       if (interaction.commandName === 'timeoff') {
         await patient(interaction.user.id);

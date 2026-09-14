@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { panel } from './panel.js';
+import { panel, adminTimeoffView } from './panel.js';
 import { timeoffView, timeoffBlocks, paginateBlocks, donationView, listMessage } from './views.js';
 
 const state = () => ({ data: { requests: {}, grants: {} } });
@@ -16,16 +16,24 @@ const noTextCards = message => {
   assert.ok(total <= 6000);
 };
 
-test('admin panel replaces both empty time-off and error text attachments with inline content', () => {
+test('admin command opens a clean control panel without lists, files, or error details', () => {
   const bot = automation();
   bot.nicknameErrors.push('Cannot edit nickname for 641307116677758976: check Manage Nicknames and role hierarchy.');
   const message = panel(state(), bot, '2026-09-14', 'Europe/Paris');
   noTextCards(message);
   const embed = message.embeds[0].toJSON();
-  assert.match(embed.description, /No time-off requests yet/);
-  assert.match(embed.description, /No days off granted yet/);
-  assert.match(embed.description, /<@641307116677758976>/);
-  assert.match(embed.description, /Manage Nicknames/);
+  assert.doesNotMatch(embed.description, /No time-off requests yet/);
+  assert.doesNotMatch(embed.description, /641307116677758976/);
+  assert.doesNotMatch(embed.description, /Manage Nicknames/);
+  assert.equal(message.components[0].toJSON().components.length, 5);
+});
+
+test('requests and grants appear only after the admin list button is used', () => {
+  const store = state();
+  store.data.requests.abc = { id: 'abc', userId: '123', status: 'pending', start: '2026-09-14', end: '2026-09-15', days: 2, reason: 'Away' };
+  const message = adminTimeoffView(store, '2026-09-14', 'Europe/Paris');
+  noTextCards(message);
+  assert.match(message.embeds[0].toJSON().description, /Request `abc`/);
   assert.equal(message.components[0].toJSON().components.length, 5);
 });
 
@@ -40,7 +48,7 @@ test('large admin lists paginate within embed limits and retain every request an
   assert.ok(count > 1);
   let combined = '';
   for (let page = 0; page < count; page++) {
-    const message = panel(store, automation(), '2026-09-14', 'Europe/Paris', page);
+    const message = adminTimeoffView(store, '2026-09-14', 'Europe/Paris', page);
     noTextCards(message);
     combined += message.embeds[0].toJSON().description;
     assert.equal(message.components.length, 2);

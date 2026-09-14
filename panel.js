@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { PATIENT_ROLE_ID } from './state.js';
-import { listMessage, timeoffBlocks, issueBlocks } from './views.js';
+import { brandedMessage } from './messages.js';
+import { listMessage, timeoffBlocks } from './views.js';
 
 export const commands = [
   new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
@@ -15,13 +16,17 @@ export const commands = [
   new SlashCommandBuilder().setName('donation-admin').setDescription('Open the private donation and time-off admin panel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ];
-export function panel(store, automation, today, timezone, page = 0) {
-  const pending = Object.values(store.data.requests).filter(r => r.status === 'pending').length;
+function adminButtons() {
   const buttons = [ ['list', 'Requests & days off'], ['grant', 'Grant days off'],
     ['approve', 'Approve request'], ['reject', 'Reject request'], ['revoke', 'Revoke days off'] ];
-  const message = listMessage('Donation admin panel',
-      'Manage requests and approved days off below. Checks run every minute.',
-      [...issueBlocks(automation), ...timeoffBlocks(store, today)], page, 'admin:page', {
+  return new ActionRowBuilder().addComponents(buttons.map(([action, label]) =>
+    new ButtonBuilder().setCustomId(`admin:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary)));
+}
+
+export function panel(store, automation, today, timezone) {
+  const pending = Object.values(store.data.requests).filter(r => r.status === 'pending').length;
+  const message = brandedMessage('Donation admin panel',
+      'Manage donation requirements and time off with the buttons below. Checks run every minute.', {
         fields: [
           { name: 'Tracked members', value: `<@&${PATIENT_ROLE_ID}>`, inline: true },
           { name: 'Pending requests', value: String(pending), inline: true },
@@ -29,8 +34,16 @@ export function panel(store, automation, today, timezone, page = 0) {
           { name: 'Last check', value: automation.lastCheck || 'Starting' },
         ],
       });
-  message.components.unshift(new ActionRowBuilder().addComponents(buttons.map(([action, label]) =>
-    new ButtonBuilder().setCustomId(`admin:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary))));
+  message.attachments = [];
+  message.components = [adminButtons()];
+  return message;
+}
+
+export function adminTimeoffView(store, today, timezone, page = 0) {
+  const message = listMessage('Requests & days off',
+    `${timezone} · Start and end dates are inclusive. Pending requests still need approval.`,
+    timeoffBlocks(store, today), page, 'admin:page');
+  message.components.unshift(adminButtons());
   return message;
 }
 export function modal(action, today) {

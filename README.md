@@ -21,7 +21,7 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 | `/timeoff-status` | Members | View their own requests and approved dates |
 | `/donation-admin` | Administrator | Open the private admin panel |
 
-The panel has buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants, dates, member mentions and statuses appear directly inside the embed. Automation or nickname permission issues also appear inline. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Clicking **Requests & days off** refreshes the panel and removes any attachments left on that panel by an older version.
+The `/donation-admin` command opens a clean control panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants, dates, member mentions and statuses appear only after an admin clicks **Requests & days off**. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
