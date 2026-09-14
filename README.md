@@ -17,11 +17,13 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 | --- | --- | --- |
 | `/donations` | Manage Server | Today's submitted, missing and excused members, with proof links |
 | `/donations date:2026-09-14` | Manage Server | Report for a previous date |
-| `/timeoff start:2026-09-15 days:3 reason:Holiday` | Patient members | Request September 15–17 inclusive |
+| `/timeoff start:2026-09-15 days:3 reason:Holiday` | Patient members | Request September 15–17 inclusive and notify the admin channel |
 | `/timeoff-status` | Members | View their own requests and approved dates |
 | `/donation-admin` | Administrator | Open the private admin panel |
 
 The `/donation-admin` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
+
+When a Patient submits `/timeoff`, the bot posts a styled request in admin channel `1532826033089151184` with **Approve** and **Reject** buttons. Only server administrators can use them. After a decision, the request message shows who approved or rejected it and the buttons disappear. Manual decisions made through `/donation-admin` also update the matching request message when it is still available.
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
@@ -33,7 +35,7 @@ All command responses and the admin panel are private to the person using them. 
 
 1. Install **Node.js 22.12 or newer**.
 2. Create an application and bot at [Discord Developer Portal](https://discord.com/developers/applications). Enable **Server Members Intent** and **Message Content Intent** on the Bot page.
-3. Invite it to your server with the `bot` and `applications.commands` scopes. Give the bot **View Channels**, **Read Message History**, **Add Reactions**, **Send Messages**, **Attach Files**, **Embed Links**, and **Manage Nicknames**. Check channel overrides in the donation channel and channels where commands are used.
+3. Invite it to your server with the `bot` and `applications.commands` scopes. Give the bot **View Channels**, **Read Message History**, **Add Reactions**, **Send Messages**, **Attach Files**, **Embed Links**, and **Manage Nicknames**. Check channel overrides in donation channel `1535655837828382740`, admin channel `1532826033089151184`, and channels where commands are used.
 4. Move the bot's highest role **above the highest role of every Patient member whose nickname it must edit**. Discord does not allow the bot to rename the server owner or members above/equal to its role. The admin panel reports these failures; eligible members still appear in reminder lists.
 5. Enable Discord Developer Mode, then copy your server ID and donation text-channel ID. Patient role ID `1532826238572298451` is already set in `state.js`; any old `CLAN_ROLE_ID` setting is ignored.
 6. Copy `.env.example` to `.env`, then set `DISCORD_TOKEN`, `GUILD_ID`, and `DONATION_CHANNEL_ID`. Keep the token private. Set `TIMEZONE` before first launch if the clan uses a timezone other than Europe/Paris.

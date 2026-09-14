@@ -22,3 +22,10 @@ test('pagination buttons keep report and admin permissions', () => {
   assert.throws(() => checkAccess({ guildId: 'server', customId: 'admin:page:1' }, 'server'), /administrators/);
   assert.doesNotThrow(() => checkAccess({ guildId: 'server', customId: 'timeoff-page:1' }, 'server'));
 });
+
+test('time-off review buttons require Administrator permission', () => {
+  const review = { guildId: 'server', customId: 'timeoff-review:approve:abc123' };
+  assert.throws(() => checkAccess(review, 'server'), /administrators/);
+  assert.throws(() => checkAccess({ ...review, memberPermissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild) }, 'server'), /administrators/);
+  assert.doesNotThrow(() => checkAccess({ ...review, memberPermissions: new PermissionsBitField(PermissionFlagsBits.Administrator) }, 'server'));
+});

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { panel, adminTimeoffView } from './panel.js';
-import { timeoffView, timeoffBlocks, paginateBlocks, donationView, listMessage } from './views.js';
+import { timeoffView, timeoffBlocks, paginateBlocks, donationView, listMessage, timeoffRequestNotice } from './views.js';
 
 const state = () => ({ data: { requests: {}, grants: {} } });
 const automation = () => ({ nicknameErrors: [], lastError: null, lastCheck: null });
@@ -98,4 +98,27 @@ test('oversized entries split without losing content and invalid page indices ar
   const message = listMessage('Issues', 'Review these issues.', [text], NaN, 'admin:page');
   noTextCards(message);
   assert.match(message.embeds[0].toJSON().description, /Page 1 of/);
+});
+
+test('new time-off request notice has approve and reject buttons without pinging the member', () => {
+  const request = { id: 'abc123', userId: '12345678901234567', start: '2026-09-15', end: '2026-09-17', days: 3, reason: 'Holiday' };
+  const message = timeoffRequestNotice(request);
+  noTextCards(message);
+  const embed = message.embeds[0].toJSON();
+  assert.match(embed.description, /<@12345678901234567>/);
+  assert.equal(embed.fields.find(field => field.name === 'Status').value, 'Waiting for administrator review');
+  assert.deepEqual(message.components[0].toJSON().components.map(button => [button.custom_id, button.style]), [
+    ['timeoff-review:approve:abc123', 3],
+    ['timeoff-review:reject:abc123', 4],
+  ]);
+});
+
+test('reviewed time-off notice shows the administrator decision and removes its buttons', () => {
+  const request = { id: 'abc123', userId: '12345678901234567', start: '2026-09-15', end: '2026-09-17', days: 3, reason: '' };
+  for (const decision of ['approved', 'rejected']) {
+    const message = timeoffRequestNotice(request, decision, '99999999999999999');
+    noTextCards(message);
+    assert.deepEqual(message.components, []);
+    assert.match(message.embeds[0].toJSON().fields.find(field => field.name === 'Status').value, new RegExp(`${decision === 'approved' ? 'Approved' : 'Rejected'} by <@99999999999999999>`));
+  }
 });

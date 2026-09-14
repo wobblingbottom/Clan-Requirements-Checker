@@ -67,6 +67,30 @@ export function timeoffView(store, today, timezone, userId, page = 0) {
     timeoffBlocks(store, today, userId), page, 'timeoff-page');
 }
 
+export function timeoffRequestNotice(request, decision, adminId) {
+  const status = decision
+    ? `${decision === 'approved' ? 'Approved' : 'Rejected'} by <@${adminId}>`
+    : 'Waiting for administrator review';
+  const message = brandedMessage('New time-off request',
+    `<@${request.userId}> requested time off.`, {
+      fields: [
+        { name: 'Dates', value: `${request.start} through ${request.end}` },
+        { name: 'Days', value: String(request.days), inline: true },
+        { name: 'Request ID', value: `\`${request.id}\``, inline: true },
+        { name: 'Reason', value: safe(request.reason || 'No reason provided') },
+        { name: 'Status', value: status },
+      ],
+    });
+  message.attachments = [];
+  message.components = decision ? [] : [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`timeoff-review:approve:${request.id}`)
+      .setLabel('Approve').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`timeoff-review:reject:${request.id}`)
+      .setLabel('Reject').setStyle(ButtonStyle.Danger),
+  )];
+  return message;
+}
+
 export function donationView(report, day, today, timezone, page = 0) {
   const blocks = [
     ...(report.submitted.length ? report.submitted.map(m => `**Submitted** · <@${m.id}>\n[View donation proof](${report.submissions.get(m.id)})`) : ['**Submitted**\nNo proof received.']),

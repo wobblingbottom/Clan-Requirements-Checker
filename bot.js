@@ -4,11 +4,12 @@ import { dayAt, validDay, hasImage } from './tracking.js';
 import { PATIENT_ROLE_ID, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
 import { commands, panel, adminTimeoffView, modal } from './panel.js';
-import { timeoffView, donationView } from './views.js';
+import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
+const ADMIN_CHANNEL_ID = '1532826033089151184';
 const timezone = process.env.TIMEZONE || 'Europe/Paris';
 for (const [name, value] of Object.entries({ GUILD_ID, DONATION_CHANNEL_ID })) {
   if (!/^\d{17,20}$/.test(value || '')) throw new Error(`Set a valid ${name} in .env`);
@@ -24,6 +25,7 @@ const client = new Client({
 let automation;
 let store;
 let timer;
+let adminChannel;
 let queue = Promise.resolve();
 const serialize = action => {
   const result = queue.then(action);
@@ -42,6 +44,15 @@ async function patient(userId) {
   if (member.user.bot || !member.roles.cache.has(PATIENT_ROLE_ID)) throw new Error('This member must have the Patient role.');
   return member;
 }
+async function updateRequestNotice(request, decision, adminId) {
+  if (!request.noticeMessageId) return;
+  try {
+    const message = await adminChannel.messages.fetch(request.noticeMessageId);
+    await message.edit(timeoffRequestNotice(request, decision, adminId));
+  } catch (error) {
+    console.error(`Could not update time-off request message ${request.id}:`, error.message);
+  }
+}
 async function handleAdminSubmit(interaction, action) {
   const get = id => interaction.fields.getTextInputValue(id).trim();
   let response;
@@ -56,9 +67,12 @@ async function handleAdminSubmit(interaction, action) {
     if (!request || request.status !== 'pending') throw new Error('Pending request not found.');
     await patient(request.userId);
     const grant = store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
+    await updateRequestNotice(request, 'approved', interaction.user.id);
     response = `Approved request ${request.id}: **${grant.start} through ${grant.end}**. Grant ID: ${grant.id}.`;
   } else if (action === 'reject') {
+    const request = store.data.requests[get('id')];
     store.reject(get('id'), interaction.user.id);
+    await updateRequestNotice(request, 'rejected', interaction.user.id);
     response = 'Request rejected. The member can see this with /timeoff-status.';
   } else if (action === 'revoke') {
     store.revoke(get('id'), interaction.user.id);
@@ -68,16 +82,39 @@ async function handleAdminSubmit(interaction, action) {
   schedule();
 }
 
+async function handleTimeoffReview(interaction) {
+  const [, action, requestId] = interaction.customId.split(':');
+  if (!['approve', 'reject'].includes(action)) throw new Error('Unknown review action.');
+  if (interaction.channelId !== ADMIN_CHANNEL_ID || interaction.message.author.id !== client.user.id) {
+    throw new Error('This review button is not from the configured admin channel.');
+  }
+  const request = store.data.requests[requestId];
+  if (!request || request.status !== 'pending') throw new Error('This request has already been reviewed or no longer exists.');
+  await patient(request.userId);
+  if (action === 'approve') store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
+  else store.reject(request.id, interaction.user.id);
+  await interaction.message.edit(timeoffRequestNotice(request, action === 'approve' ? 'approved' : 'rejected', interaction.user.id));
+  await interaction.editReply(brandedMessage(`Request ${action === 'approve' ? 'approved' : 'rejected'}`,
+    `<@${request.userId}> has been ${action === 'approve' ? 'excused for the requested dates' : 'kept on the donation requirement'}.`));
+  schedule();
+}
+
 client.once(Events.ClientReady, async () => {
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
     const channel = await guild.channels.fetch(DONATION_CHANNEL_ID);
+    adminChannel = await guild.channels.fetch(ADMIN_CHANNEL_ID);
     if (channel?.type !== ChannelType.GuildText) throw new Error('Donation channel must be a normal text channel in this server.');
+    if (adminChannel?.type !== ChannelType.GuildText) throw new Error('Admin channel 1532826033089151184 must be a normal text channel in this server.');
     if (!await guild.roles.fetch(PATIENT_ROLE_ID)) throw new Error('Patient role 1532826238572298451 not found in this server.');
     const me = await guild.members.fetchMe();
     const permissions = channel.permissionsFor(me);
     for (const permission of ['ViewChannel', 'ReadMessageHistory', 'AddReactions', 'SendMessages', 'AttachFiles', 'EmbedLinks']) {
       if (!permissions?.has(PermissionFlagsBits[permission])) throw new Error(`Missing donation channel permission: ${permission}`);
+    }
+    const adminPermissions = adminChannel.permissionsFor(me);
+    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'EmbedLinks', 'AttachFiles']) {
+      if (!adminPermissions?.has(PermissionFlagsBits[permission])) throw new Error(`Missing admin channel permission: ${permission}`);
     }
     if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
     store = new Store(fileURLToPath(new URL('./data/state.json', import.meta.url)), today(), GUILD_ID, timezone);
@@ -105,7 +142,7 @@ client.on(Events.MessageCreate, async message => {
 
 client.on(Events.InteractionCreate, async interaction => {
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
-  const isButton = interaction.isButton() && ['admin:', 'timeoff-page:', 'report-page:'].some(prefix => interaction.customId.startsWith(prefix));
+  const isButton = interaction.isButton() && ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix));
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
   if (!isCommand && !isButton && !isModal) return;
   try {
@@ -118,9 +155,12 @@ client.on(Events.InteractionCreate, async interaction => {
       await interaction.showModal(modal(action, today()));
       return;
     }
-    if (isButton) await interaction.deferUpdate();
+    const isReview = isButton && interaction.customId.startsWith('timeoff-review:');
+    if (isReview) await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    else if (isButton) await interaction.deferUpdate();
     else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await serialize(async () => {
+      if (isReview) return handleTimeoffReview(interaction);
       const page = isButton ? Number(interaction.customId.split(':').at(-1)) || 0 : 0;
       if (isModal) return handleAdminSubmit(interaction, interaction.customId.split(':')[1]);
       if (interaction.commandName === 'donation-admin') {
@@ -136,6 +176,15 @@ client.on(Events.InteractionCreate, async interaction => {
         dateRange(start, days);
         if (start < today()) throw new Error('Requests must start today or later. Ask an admin for a retroactive exemption.');
         const request = store.request(interaction.user.id, start, days, interaction.options.getString('reason') || '');
+        try {
+          const notice = await adminChannel.send(timeoffRequestNotice(request));
+          request.noticeMessageId = notice.id;
+          store.save();
+        } catch (error) {
+          console.error(`Could not notify admins about request ${request.id}:`, error.message);
+          return interaction.editReply(brandedMessage('Time-off request saved',
+            `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/donation-admin\`.`));
+        }
         return interaction.editReply(brandedMessage('Time-off request submitted',
           'Your request is waiting for an administrator. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
             fields: [
