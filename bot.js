@@ -10,7 +10,7 @@ import { brandedMessage } from './messages.js';
 import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
-const ADMIN_CHANNEL_ID = '1532826033089151184';
+const ADMIN_CHANNEL_ID = '1537173435611090944';
 const timezone = process.env.TIMEZONE || 'Europe/Paris';
 for (const [name, value] of Object.entries({ GUILD_ID, DONATION_CHANNEL_ID })) {
   if (!/^\d{17,20}$/.test(value || '')) throw new Error(`Set a valid ${name} in .env`);
@@ -111,7 +111,7 @@ client.once(Events.ClientReady, async () => {
     const channel = await guild.channels.fetch(DONATION_CHANNEL_ID);
     adminChannel = await guild.channels.fetch(ADMIN_CHANNEL_ID);
     if (channel?.type !== ChannelType.GuildText) throw new Error('Donation channel must be a normal text channel in this server.');
-    if (adminChannel?.type !== ChannelType.GuildText) throw new Error('Admin channel 1532826033089151184 must be a normal text channel in this server.');
+    if (adminChannel?.type !== ChannelType.GuildText) throw new Error('Admin channel 1537173435611090944 must be a normal text channel in this server.');
     for (const roleId of TIMEOFF_ROLE_IDS) {
       if (!await guild.roles.fetch(roleId)) throw new Error(`Configured time-off role ${roleId} was not found in this server.`);
     }
