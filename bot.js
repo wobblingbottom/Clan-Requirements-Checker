@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { dayAt, validDay, hasImage } from './tracking.js';
 import { PATIENT_ROLE_ID, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
-import { commands, panel, modal, timeoffList, file, clean } from './panel.js';
+import { commands, panel, modal } from './panel.js';
+import { timeoffView, donationView } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
 
@@ -104,22 +105,27 @@ client.on(Events.MessageCreate, async message => {
 
 client.on(Events.InteractionCreate, async interaction => {
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
-  const isButton = interaction.isButton() && interaction.customId.startsWith('admin:');
+  const isButton = interaction.isButton() && ['admin:', 'timeoff-page:', 'report-page:'].some(prefix => interaction.customId.startsWith(prefix));
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
   if (!isCommand && !isButton && !isModal) return;
   try {
     if (!automation || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
     checkAccess(interaction, GUILD_ID);
-    if (isButton && interaction.customId !== 'admin:list') {
+    if (isButton && interaction.customId.startsWith('admin:')
+        && interaction.customId !== 'admin:list' && !interaction.customId.startsWith('admin:page:')) {
       const action = interaction.customId.split(':')[1];
       if (!['grant', 'approve', 'reject', 'revoke'].includes(action)) throw new Error('Unknown action.');
       await interaction.showModal(modal(action, today()));
       return;
     }
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    if (isButton) await interaction.deferUpdate();
+    else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await serialize(async () => {
+      const page = isButton ? Number(interaction.customId.split(':').at(-1)) || 0 : 0;
       if (isModal) return handleAdminSubmit(interaction, interaction.customId.split(':')[1]);
-      if (isButton || interaction.commandName === 'donation-admin') return interaction.editReply(panel(store, automation, today(), timezone));
+      if ((isButton && interaction.customId.startsWith('admin:')) || interaction.commandName === 'donation-admin') {
+        return interaction.editReply(panel(store, automation, today(), timezone, page));
+      }
       if (interaction.commandName === 'timeoff') {
         await patient(interaction.user.id);
         const start = interaction.options.getString('start');
@@ -136,39 +142,19 @@ client.on(Events.InteractionCreate, async interaction => {
             ],
           }));
       }
-      if (interaction.commandName === 'timeoff-status') {
-        return interaction.editReply(brandedMessage('Your days off',
-          'Your requests and approved dates are attached. Pending requests still need admin approval.', {
-            files: [file(timeoffList(store, today(), timezone, interaction.user.id), 'my-time-off.txt')],
-          }));
+      if (interaction.commandName === 'timeoff-status' || (isButton && interaction.customId.startsWith('timeoff-page:'))) {
+        return interaction.editReply(timeoffView(store, today(), timezone, interaction.user.id, page));
       }
-      const day = interaction.options.getString('date') || today();
+      const day = isButton ? interaction.customId.split(':')[1] : interaction.options.getString('date') || today();
       if (!validDay(day) || day > today() || day < '2015-01-01') throw new Error('Use a real YYYY-MM-DD date from 2015 through today.');
       const report = await automation.report(day);
-      const label = m => `${clean(m.displayName)} (${m.id})`;
-      const text = [
-        `Daily donation proof: ${day} (${timezone})`,
-        'Image uploads are not verified donations. Roster uses current Patient members.',
-        ...(day === today() ? ['Today is still in progress.'] : []),
-        '', `SUBMITTED (${report.submitted.length})`, ...report.submitted.map(m => `${label(m)}: ${report.submissions.get(m.id)}`),
-        '', `MISSING (${report.missing.length})`, ...report.missing.map(label),
-        '', `EXCUSED (${report.excused.length})`, ...report.excused.map(label),
-      ].join('\n');
-      return interaction.editReply(brandedMessage('Daily donation report',
-        `**${day}** · ${timezone}\nTracking **${report.roster.length}** Patient members.\nFull member lists and screenshot links are attached.${day === today() ? '\n\nToday is still in progress.' : ''}`, {
-        fields: [
-          { name: 'Submitted', value: String(report.submitted.length), inline: true },
-          { name: 'Missing proof', value: String(report.missing.length), inline: true },
-          { name: 'Excused', value: String(report.excused.length), inline: true },
-        ],
-        files: [file(text, `donations-${day}.txt`)],
-      }));
+      return interaction.editReply(donationView(report, day, today(), timezone, page));
     });
   } catch (error) {
     console.error('Interaction failed:', error.message);
     const payload = brandedMessage('Unable to complete this action', String(error.message).slice(0, 1900));
     try {
-      if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
+      if (interaction.deferred || interaction.replied) await interaction.editReply({ ...payload, attachments: [], components: [] });
       else await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
     } catch (replyError) { console.error('Could not respond:', replyError.message); }
   }

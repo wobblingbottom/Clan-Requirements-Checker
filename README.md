@@ -21,7 +21,7 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 | `/timeoff-status` | Members | View their own requests and approved dates |
 | `/donation-admin` | Administrator | Open the private admin panel |
 
-The panel has buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. The attached list contains member IDs, request IDs, grant IDs, dates, and statuses. The panel also lists automation or nickname permission errors.
+The panel has buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants, dates, member mentions and statuses appear directly inside the embed. Automation or nickname permission issues also appear inline. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Clicking **Requests & days off** refreshes the panel and removes any attachments left on that panel by an older version.
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
@@ -54,7 +54,7 @@ Attach a persistent volume at `/app/data` before starting the bot, keep one repl
 
 ## Message appearance
 
-All bot replies use colour `#f45f77`, the message heading in the author row beside the pointing-hand icon, and a footer reading **Crazyland Asylum** beside the Crazyland logo. There is no separate embed title. Reminders match the supplied example: **Crazyland clan donation reminder.** in the author row and **Don't forget to donate your daily!** in the body, without statistic fields. The missed date and actual member pings appear above the embed. The admin panel keeps its controls and reports keep their counts and downloadable lists.
+All bot replies use colour `#f45f77`, the message heading in the author row beside the pointing-hand icon, and a footer reading **Crazyland Asylum** beside the Crazyland logo. There is no separate embed title. Reminders match the supplied example: **Crazyland clan donation reminder.** in the author row and **Don't forget to donate your daily!** in the body, without statistic fields. The missed date and actual member pings appear above the embed. Reports, personal time-off lists and admin issues are shown in the embeds with page buttons when needed. Reports include clickable screenshot links; there are no text report attachments.
 
 The pointing-hand author icon loads from `assets/author-icon.png`; the Crazyland footer logo loads from `assets/footer-icon.png`. When present, both are attached directly to each message. Otherwise set `EMBED_AUTHOR_ICON_URL` to the pointing-hand image URL and `EMBED_FOOTER_ICON_URL` to the Crazyland logo URL in Railway Variables. Missing icons are omitted. The bot needs **Embed Links** permission in the donation channel.
 

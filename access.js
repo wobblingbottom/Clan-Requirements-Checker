@@ -7,7 +7,8 @@ export function checkAccess(interaction, guildId) {
   if (admin && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
     throw new Error('Only server administrators can manage days off.');
   }
-  if (interaction.commandName === 'donations' && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if ((interaction.commandName === 'donations' || interaction.customId?.startsWith('report-page:'))
+      && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     throw new Error('You need Manage Server permission to view donation reports.');
   }
 }

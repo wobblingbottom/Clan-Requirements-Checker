@@ -1,0 +1,82 @@
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown } from 'discord.js';
+import { brandedMessage } from './messages.js';
+
+const safe = value => escapeMarkdown(String(value).replace(/[\r\n\t]/g, ' '));
+
+export function paginateBlocks(blocks, limit = 2800) {
+  const pages = [];
+  let current = '';
+  for (const block of blocks) {
+    // Requests are short, but an external API error can be arbitrarily long.
+    // Split oversized entries instead of silently dropping any list items.
+    const pieces = [];
+    let piece = '';
+    for (const character of block) {
+      if (piece.length + character.length > limit) { pieces.push(piece); piece = ''; }
+      piece += character;
+    }
+    if (piece) pieces.push(piece);
+    for (const part of pieces) {
+      if (current && current.length + part.length + 2 > limit) { pages.push(current); current = ''; }
+      current += `${current ? '\n\n' : ''}${part}`;
+    }
+  }
+  if (current) pages.push(current);
+  return pages.length ? pages : ['Nothing to show yet.'];
+}
+
+export function listMessage(title, intro, blocks, requestedPage, buttonPrefix, options = {}) {
+  const pages = paginateBlocks(blocks);
+  const page = Math.max(0, Math.min(Number.isSafeInteger(requestedPage) ? requestedPage : 0, pages.length - 1));
+  const message = brandedMessage(title, `${intro}\n\n${pages[page]}${pages.length > 1 ? `\n\nPage ${page + 1} of ${pages.length}` : ''}`, options);
+  // Editing an old panel explicitly removes its obsolete text-file cards.
+  message.attachments = [];
+  message.components = pages.length > 1 ? [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`${buttonPrefix}:${Math.max(0, page - 1)}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId(`${buttonPrefix}:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page === pages.length - 1),
+  )] : [];
+  return message;
+}
+
+export function timeoffBlocks(store, today, userId) {
+  const requests = Object.values(store.data.requests).filter(r => !userId || r.userId === userId)
+    .sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending') || b.start.localeCompare(a.start));
+  const grants = Object.values(store.data.grants).filter(g => !userId || g.userId === userId)
+    .sort((a, b) => b.start.localeCompare(a.start));
+  return [
+    ...(requests.length ? requests.map(r => `**Request \`${r.id}\` · ${safe(r.status)}**\n<@${r.userId}> · ${r.start} → ${r.end} · ${r.days} day(s)${r.reason ? `\nReason: ${safe(r.reason)}` : ''}`) : ['**Requests**\nNo time-off requests yet.']),
+    ...(grants.length ? grants.map(g => {
+      const status = g.revokedAt ? 'Revoked' : g.end < today ? 'Expired' : g.start > today ? 'Scheduled' : 'Active';
+      return `**Days off \`${g.id}\` · ${status}**\n<@${g.userId}> · ${g.start} → ${g.end}\nApproved by <@${g.adminId}>`;
+    }) : ['**Approved days off**\nNo days off granted yet.']),
+  ];
+}
+
+export function issueBlocks(automation) {
+  const errors = [...automation.nicknameErrors, ...(automation.lastError ? [automation.lastError] : [])];
+  return errors.map(error => {
+    const member = /^Cannot edit nickname for (\d+):/.exec(error);
+    return member
+      ? `**Nickname update needs attention**\nI can’t edit <@${member[1]}>. Check **Manage Nicknames** and place the bot’s role above this member’s highest role. The server owner cannot be renamed.`
+      : `**Automation needs attention**\n${safe(error)}`;
+  });
+}
+
+export function timeoffView(store, today, timezone, userId, page = 0) {
+  return listMessage('Your days off', `${timezone} · Start and end dates are inclusive.\nPending requests need admin approval.`,
+    timeoffBlocks(store, today, userId), page, 'timeoff-page');
+}
+
+export function donationView(report, day, today, timezone, page = 0) {
+  const blocks = [
+    ...(report.submitted.length ? report.submitted.map(m => `**Submitted** · <@${m.id}>\n[View donation proof](${report.submissions.get(m.id)})`) : ['**Submitted**\nNo proof received.']),
+    ...(report.missing.length ? report.missing.map(m => `**Missing proof** · <@${m.id}>`) : ['**Missing proof**\nNobody is missing proof.']),
+    ...(report.excused.length ? report.excused.map(m => `**Excused** · <@${m.id}>`) : ['**Excused**\nNo members on approved days off.']),
+  ];
+  return listMessage('Daily donation report', `**${day}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
+    blocks, page, `report-page:${day}`, { fields: [
+      { name: 'Submitted', value: String(report.submitted.length), inline: true },
+      { name: 'Missing proof', value: String(report.missing.length), inline: true },
+      { name: 'Excused', value: String(report.excused.length), inline: true },
+    ] });
+}

@@ -1,7 +1,7 @@
-import { SlashCommandBuilder, PermissionFlagsBits, AttachmentBuilder, ActionRowBuilder,
+import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { PATIENT_ROLE_ID } from './state.js';
-import { brandedMessage } from './messages.js';
+import { listMessage, timeoffBlocks, issueBlocks } from './views.js';
 
 export const commands = [
   new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
@@ -15,37 +15,23 @@ export const commands = [
   new SlashCommandBuilder().setName('donation-admin').setDescription('Open the private donation and time-off admin panel')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ];
-export const file = (text, name) => new AttachmentBuilder(Buffer.from(text, 'utf8'), { name });
-export const clean = value => String(value).replace(/[\r\n\t]/g, ' ');
-export function timeoffList(store, today, timezone, userId) {
-  const requests = Object.values(store.data.requests).filter(r => !userId || r.userId === userId);
-  const grants = Object.values(store.data.grants).filter(g => !userId || g.userId === userId);
-  return [
-    `Time off (${timezone}); start and end dates are inclusive.`,
-    'Pending requests are NOT exemptions. Approved time off is required.',
-    '', 'REQUESTS', ...requests.map(r => `${r.id} | user ${r.userId} | ${r.start} to ${r.end} | ${r.days} days | ${r.status} | ${clean(r.reason || '')}`),
-    '', 'GRANTS', ...grants.map(g => `${g.id} | user ${g.userId} | ${g.start} to ${g.end} | ${g.revokedAt ? 'revoked' : g.end < today ? 'expired' : g.start > today ? 'scheduled' : 'active'} | admin ${g.adminId}`),
-  ].join('\n');
-}
-export function panel(store, automation, today, timezone) {
+export function panel(store, automation, today, timezone, page = 0) {
   const pending = Object.values(store.data.requests).filter(r => r.status === 'pending').length;
   const buttons = [ ['list', 'Requests & days off'], ['grant', 'Grant days off'],
     ['approve', 'Approve request'], ['reject', 'Reject request'], ['revoke', 'Revoke days off'] ];
-  const errors = [...automation.nicknameErrors, ...(automation.lastError ? [automation.lastError] : [])];
-  return {
-    ...brandedMessage('Donation admin panel',
-      `Manage time-off requests and donation requirements below.\nChecks run every minute. Request and grant IDs are in the attached list.${errors.length ? `\n\n**${errors.length} automation issue(s)** — see issues.txt.` : ''}`, {
+  const message = listMessage('Donation admin panel',
+      'Manage requests and approved days off below. Checks run every minute.',
+      [...issueBlocks(automation), ...timeoffBlocks(store, today)], page, 'admin:page', {
         fields: [
           { name: 'Tracked members', value: `<@&${PATIENT_ROLE_ID}>`, inline: true },
           { name: 'Pending requests', value: String(pending), inline: true },
           { name: 'Timezone', value: timezone, inline: true },
           { name: 'Last check', value: automation.lastCheck || 'Starting' },
         ],
-        files: [file(timeoffList(store, today, timezone), 'time-off.txt'), ...(errors.length ? [file(errors.join('\n'), 'issues.txt')] : [])],
-      }),
-    components: [new ActionRowBuilder().addComponents(buttons.map(([action, label]) =>
-      new ButtonBuilder().setCustomId(`admin:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary)))],
-  };
+      });
+  message.components.unshift(new ActionRowBuilder().addComponents(buttons.map(([action, label]) =>
+    new ButtonBuilder().setCustomId(`admin:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary))));
+  return message;
 }
 export function modal(action, today) {
   const specs = action === 'grant' ? [

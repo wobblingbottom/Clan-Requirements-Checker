@@ -16,3 +16,9 @@ test('requests stay available to members; reports require Manage Server and all 
   assert.throws(() => checkAccess({ guildId: 'server', commandName: 'donations' }, 'server'), /Manage Server/);
   assert.throws(() => checkAccess({ guildId: 'other', commandName: 'timeoff' }, 'server'), /configured server/);
 });
+
+test('pagination buttons keep report and admin permissions', () => {
+  assert.throws(() => checkAccess({ guildId: 'server', customId: 'report-page:2026-09-14:1' }, 'server'), /Manage Server/);
+  assert.throws(() => checkAccess({ guildId: 'server', customId: 'admin:page:1' }, 'server'), /administrators/);
+  assert.doesNotThrow(() => checkAccess({ guildId: 'server', customId: 'timeoff-page:1' }, 'server'));
+});
