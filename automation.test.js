@@ -118,7 +118,7 @@ test('midnight closes the previous local day once and skips pre-install days', a
   assert.deepEqual(dates, ['2026-09-14']);
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].allowedMentions, { parse: [], users: ['a'] });
-  assert.equal(sent[0].content, '<@a>');
+  assert.ok(sent[0].content.endsWith('<@a>'));
   assert.equal(sent[0].embeds[0].toJSON().color, 0xf45f77);
   assert.equal(store.data.lastClosedDay, '2026-09-14');
 });
@@ -177,6 +177,17 @@ test('upgrading to embeds still recognizes an interrupted legacy plain-text remi
   automation.report = async () => ({ missing: [member('a')] });
   history.set('old', { id: 'old', author: { id: 'bot' },
     content: '<@a>\n[donation-reminder:2026-09-14:0]', createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
+  await automation.closeDay('2026-09-14');
+  assert.equal(sent.length, 0);
+});
+
+test('simplifying the layout still recognizes an interrupted old-style embed', async t => {
+  const store = makeStore(t);
+  const { automation, sent, history } = fakeAutomation(t, store);
+  automation.report = async () => ({ missing: [member('a')] });
+  history.set('old', { id: 'old', author: { id: 'bot' }, content: '<@a>',
+    embeds: [{ title: 'Donation proof reminder', footer: { text: 'Crazyland • 2026-09-14 • Reminder 1' } }],
+    createdTimestamp: Date.parse('2026-09-14T22:01:00Z') });
   await automation.closeDay('2026-09-14');
   assert.equal(sent.length, 0);
 });

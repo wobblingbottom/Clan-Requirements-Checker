@@ -3,6 +3,10 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const EMBED_COLOR = 0xf45f77;
+export const REMINDER_AUTHOR = 'Crazyland clan donation reminder.';
+export const REMINDER_DESCRIPTION = "Don't forget to donate your daily!";
+export const BRAND_FOOTER = 'Crazyland Asylum';
+// Retained for recovery of reminders sent by the previous version.
 export const reminderFooter = (day, batchIndex) => `Crazyland • ${day} • Reminder ${batchIndex + 1}`;
 
 function icon(kind, files) {
@@ -27,10 +31,9 @@ export function brandedMessage(title, description, options = {}) {
   const footerIcon = icon('footer', files);
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
-    .setAuthor({ name: 'Crazyland', ...(authorIcon ? { iconURL: authorIcon } : {}) })
-    .setTitle(title)
+    .setAuthor({ name: title, ...(authorIcon ? { iconURL: authorIcon } : {}) })
     .setDescription(description)
-    .setFooter({ text: options.footer || 'Crazyland • Clan Requirements', ...(footerIcon ? { iconURL: footerIcon } : {}) });
+    .setFooter({ text: BRAND_FOOTER, ...(footerIcon ? { iconURL: footerIcon } : {}) });
   if (options.fields?.length) embed.addFields(options.fields);
   return {
     content: options.content || '', embeds: [embed], files,
@@ -38,16 +41,23 @@ export function brandedMessage(title, description, options = {}) {
   };
 }
 
-export function reminderMessage(day, timezone, channelId, ids, batchIndex) {
-  return brandedMessage('Donation proof reminder',
-    `We couldn’t find your donation proof for **${day}**.\nPlease remember to post your daily screenshot in <#${channelId}>.\n\nMembers with approved days off are excused.`, {
+export function reminderMessage(day, timezone, ids) {
+  return brandedMessage(REMINDER_AUTHOR, REMINDER_DESCRIPTION, {
       // Discord only notifies mentions in message content, not inside embeds.
-      content: ids.map(id => `<@${id}>`).join(' '), mentionUsers: ids,
-      fields: [
-        { name: 'Date', value: day, inline: true },
-        { name: 'Timezone', value: timezone, inline: true },
-        { name: 'Missing proof', value: String(ids.length), inline: true },
-      ],
-      footer: reminderFooter(day, batchIndex),
+      content: `Missing donation proof for **${day}** (${timezone}):\n${ids.map(id => `<@${id}>`).join(' ')}`,
+      mentionUsers: ids,
     });
+}
+
+export function matchesReminder(message, day, batchIndex, batchIds) {
+  if (message.content?.includes(`[donation-reminder:${day}:${batchIndex}]`)) return true;
+  return Boolean(message.embeds?.some(embed => {
+    if (embed.title === 'Donation proof reminder' && embed.footer?.text === reminderFooter(day, batchIndex)) return true;
+    // The simpler footer no longer carries the batch number. Batches have
+    // disjoint member IDs, so match the missed date and a member of this batch.
+    return embed.author?.name === REMINDER_AUTHOR && embed.description === REMINDER_DESCRIPTION
+      && embed.footer?.text === BRAND_FOOTER
+      && message.content?.startsWith(`Missing donation proof for **${day}** (`)
+      && batchIds.some(id => message.content.includes(`<@${id}>`));
+  }));
 }

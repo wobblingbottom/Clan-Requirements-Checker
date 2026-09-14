@@ -54,9 +54,9 @@ Attach a persistent volume at `/app/data` before starting the bot, keep one repl
 
 ## Message appearance
 
-All bot replies and reminders use Crazyland embeds with colour `#f45f77`, an author header and a footer. The admin panel keeps its buttons and reports keep their downloadable lists. Reminder mentions appear above the embed so they can notify the missing members.
+All bot replies use colour `#f45f77`, the message heading in the author row beside the pointing-hand icon, and a footer reading **Crazyland Asylum** beside the Crazyland logo. There is no separate embed title. Reminders match the supplied example: **Crazyland clan donation reminder.** in the author row and **Don't forget to donate your daily!** in the body, without statistic fields. The missed date and actual member pings appear above the embed. The admin panel keeps its controls and reports keep their counts and downloadable lists.
 
-The author and footer icons load from `assets/author-icon.png` and `assets/footer-icon.png` when present and are attached directly to each message. Otherwise you can set `EMBED_AUTHOR_ICON_URL` and `EMBED_FOOTER_ICON_URL` to direct public image URLs in Railway Variables. Missing icons are omitted. The bot needs **Embed Links** permission in the donation channel.
+The pointing-hand author icon loads from `assets/author-icon.png`; the Crazyland footer logo loads from `assets/footer-icon.png`. When present, both are attached directly to each message. Otherwise set `EMBED_AUTHOR_ICON_URL` to the pointing-hand image URL and `EMBED_FOOTER_ICON_URL` to the Crazyland logo URL in Railway Variables. Missing icons are omitted. The bot needs **Embed Links** permission in the donation channel.
 
 ## Storage, recovery and limits
 
