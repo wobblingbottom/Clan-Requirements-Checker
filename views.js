@@ -78,6 +78,11 @@ export function timeoffRequestNotice(request, decision, adminId) {
         { name: 'Days', value: String(request.days), inline: true },
         { name: 'Request ID', value: `\`${request.id}\``, inline: true },
         { name: 'Reason', value: safe(request.reason || 'No reason provided') },
+        { name: 'Latest donation screenshot', value: request.latestScreenshot?.url
+          ? `[View screenshot](${request.latestScreenshot.url})`
+          : request.latestScreenshot?.status === 'not-found' ? 'No screenshot found in the donation channel.'
+            : request.latestScreenshot?.status === 'limit' ? 'No screenshot found in the latest 10,000 channel messages.'
+              : 'Screenshot lookup unavailable.' },
         { name: 'Status', value: status },
       ],
     });

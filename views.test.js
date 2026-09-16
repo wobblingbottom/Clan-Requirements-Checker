@@ -115,9 +115,12 @@ test('new time-off request notice has approve and reject buttons without pinging
 
 test('reviewed time-off notice shows the administrator decision and removes its buttons', () => {
   const request = { id: 'abc123', userId: '12345678901234567', start: '2026-09-15', end: '2026-09-17', days: 3, reason: '' };
+  request.latestScreenshot = { status: 'found', url: 'https://discord.com/channels/1/2/3' };
   for (const decision of ['approved', 'rejected']) {
     const message = timeoffRequestNotice(request, decision, '99999999999999999');
     noTextCards(message);
+    assert.equal(message.embeds[0].data.fields.find(field => field.name === 'Latest donation screenshot').value,
+      '[View screenshot](https://discord.com/channels/1/2/3)');
     assert.deepEqual(message.components, []);
     assert.match(message.embeds[0].toJSON().fields.find(field => field.name === 'Status').value, new RegExp(`${decision === 'approved' ? 'Approved' : 'Rejected'} by <@99999999999999999>`));
   }

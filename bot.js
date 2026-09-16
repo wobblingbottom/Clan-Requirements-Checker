@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Events, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { fileURLToPath } from 'node:url';
-import { dayAt, validDay, hasImage } from './tracking.js';
+import { dayAt, validDay, hasImage, latestScreenshot } from './tracking.js';
 import { PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, canRequestTimeoff, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
 import { commands, panel, adminTimeoffView, modal } from './panel.js';
@@ -202,6 +202,13 @@ client.on(Events.InteractionCreate, async interaction => {
         dateRange(start, days);
         if (start < today()) throw new Error('Requests must start today or later. Ask an admin for a retroactive exemption.');
         const request = store.request(interaction.user.id, start, days, reason);
+        try {
+          request.latestScreenshot = await latestScreenshot(automation.channel, interaction.user.id);
+        } catch (error) {
+          console.error(`Could not look up donation proof for request ${request.id}:`, error.message);
+          request.latestScreenshot = { status: 'unavailable' };
+        }
+        store.save();
         try {
           const notice = await adminChannel.send(timeoffRequestNotice(request));
           request.noticeMessageId = notice.id;

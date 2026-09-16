@@ -18,6 +18,20 @@ export function hasImage(message) {
     && a.width > 0 && a.height > 0);
 }
 
+export async function latestScreenshot(channel, userId, maxPages = 100) {
+  let before;
+  for (let page = 0; page < maxPages; page++) {
+    const batch = await channel.messages.fetch({ limit: 100, cache: false, ...(before ? { before } : {}) });
+    const messages = [...batch.values()].sort((a, b) => BigInt(a.id) > BigInt(b.id) ? -1 : 1);
+    const proof = messages.find(message => message.author.id === userId
+      && !message.author.bot && !message.webhookId && hasImage(message));
+    if (proof) return { url: proof.url, status: 'found' };
+    if (messages.length < 100) return { status: 'not-found' };
+    before = messages.at(-1).id;
+  }
+  return { status: 'limit' };
+}
+
 // Fetch around the local day with enough padding for all UTC offsets and DST.
 // Read Discord history each time so restarts, missed events, and deletions are reflected.
 export async function collectSubmissions(channel, day, timezone) {
