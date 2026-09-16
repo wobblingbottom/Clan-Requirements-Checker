@@ -7,7 +7,7 @@ export const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption(o => o.setName('date').setDescription('YYYY-MM-DD; defaults to today')),
   new SlashCommandBuilder().setName('timeoff').setDescription('Request days off from donation requirements')
-    .addStringOption(o => o.setName('start').setDescription('First day off: YYYY-MM-DD').setRequired(true))
+    .addStringOption(o => o.setName('start').setDescription('First day off: e.g. 16 Sep (current year)').setRequired(true))
     .addIntegerOption(o => o.setName('days').setDescription('Number of days, including the start date').setMinValue(1).setMaxValue(365).setRequired(true))
     .addStringOption(o => o.setName('reason').setDescription('Reason, visible only to you and admins').setMaxLength(500)),
   new SlashCommandBuilder().setName('timeoff-status').setDescription('View your time-off requests and approved dates'),

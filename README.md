@@ -19,7 +19,7 @@ On startup the bot posts the branded member vacations notice in channel `1549128
 | --- | --- | --- |
 | `/donations` | Manage Server | Today's submitted, missing and excused members, with proof links |
 | `/donations date:2026-09-14` | Manage Server | Report for a previous date |
-| `/timeoff start:2026-09-15 days:3 reason:Holiday` | Members with an allowed time-off role | Request September 15–17 inclusive and notify the admin channel |
+| `/timeoff start:15 Sep days:3 reason:Holiday` | Members with an allowed time-off role | Request September 15–17 inclusive and notify the admin channel |
 | `/timeoff-status` | Members | View their own requests and approved dates |
 | `/donation-admin` | Administrator | Open the private admin panel |
 
@@ -29,7 +29,7 @@ Members with role `1532826238572298451`, `1532826140086112256`, `153282677262476
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
-Periods include both the start and end date, and can last 1–365 days. Overlapping grants are allowed; any applicable grant excuses the member. Revoking a grant voids that entire grant, including in later historical reports. It does not cancel other overlapping grants. Admins can grant retroactive days off, but this cannot retract reminders already sent. Members can request today or future dates and have up to five pending requests.
+Member start dates use a day and three-letter English month, such as 16 Sep, in the current server-local year. YYYY-MM-DD is also accepted for explicit years. Past start dates are rejected. Periods include both the start and end date, and can last 1–365 days. Overlapping grants are allowed; any applicable grant excuses the member. Revoking a grant voids that entire grant, including in later historical reports. It does not cancel other overlapping grants. Admins can grant retroactive days off, but this cannot retract reminders already sent. Members can request today or future dates and have up to five pending requests.
 
 All command responses and the admin panel are private to the person using them. Members see approval or rejection through `/timeoff-status`; the bot does not send DMs. Only the end-of-day reminder intentionally pings members.
 

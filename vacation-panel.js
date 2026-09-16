@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { brandedMessage } from './messages.js';
+import { formatTimeoffDate } from './timeoff-date.js';
 
 export const VACATION_CHANNEL_ID = '1549128315095355422';
 export const VACATION_BUTTON = 'vacation:request';
@@ -10,7 +11,7 @@ export function vacationNotice() {
     ...brandedMessage('Crazyland clan member vacations.',
       "If you'll be inactive for a few days, let the leadership team know by __creating a ticket__ using the button below. Include how long you expect to be away and, if possible, the reason for your absence.\n\n"
       + '**Member commands**\n'
-      + '`/timeoff` — Request days off with a start date (YYYY-MM-DD), number of days (1–365), and optional reason. You can also use the **Create ticket** button.\n'
+      + '`/timeoff` — Request days off with a start date (e.g. 16 Sep, current year), number of days (1–365), and optional reason. You can also use the **Create ticket** button.\n'
       + '`/timeoff-status` — View your requests, approval status, and approved dates.\n\n'
       + 'Time off must be approved by a Leader or Co-leader before you are excused from donation requirements.'),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
@@ -20,8 +21,8 @@ export function vacationNotice() {
 
 export function vacationModal(today) {
   const fields = [
-    new TextInputBuilder().setCustomId('start').setLabel('Start date (YYYY-MM-DD)').setStyle(TextInputStyle.Short)
-      .setRequired(true).setMinLength(10).setMaxLength(10).setValue(today),
+    new TextInputBuilder().setCustomId('start').setLabel('Start date (e.g. 16 Sep, current year)').setStyle(TextInputStyle.Short)
+      .setRequired(true).setMinLength(5).setMaxLength(10).setValue(formatTimeoffDate(today)),
     new TextInputBuilder().setCustomId('days').setLabel('Number of days off (1–365)').setStyle(TextInputStyle.Short)
       .setRequired(true).setMaxLength(3),
     new TextInputBuilder().setCustomId('reason').setLabel('Reason (optional)').setStyle(TextInputStyle.Paragraph)

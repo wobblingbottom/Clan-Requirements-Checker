@@ -7,6 +7,7 @@ import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
+import { parseTimeoffDate } from './timeoff-date.js';
 import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
@@ -195,7 +196,7 @@ client.on(Events.InteractionCreate, async interaction => {
       }
       if (interaction.commandName === 'timeoff' || isVacationSubmit) {
         await timeoffMember(interaction.user.id);
-        const start = isVacationSubmit ? interaction.fields.getTextInputValue('start').trim() : interaction.options.getString('start');
+        const start = parseTimeoffDate(isVacationSubmit ? interaction.fields.getTextInputValue('start').trim() : interaction.options.getString('start'), today());
         const days = isVacationSubmit ? Number(interaction.fields.getTextInputValue('days').trim()) : interaction.options.getInteger('days');
         const reason = isVacationSubmit ? interaction.fields.getTextInputValue('reason').trim() : interaction.options.getString('reason') || '';
         dateRange(start, days);
