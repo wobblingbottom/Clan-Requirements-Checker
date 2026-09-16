@@ -1,6 +1,7 @@
 import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { formatTimeoffDate } from './timeoff-date.js';
 
 export const EMBED_COLOR = 0xf45f77;
 export const REMINDER_AUTHOR = 'Crazyland clan donation reminder.';
@@ -44,9 +45,10 @@ export function brandedMessage(title, description, options = {}) {
 }
 
 export function reminderMessage(day, timezone, ids) {
+  const displayDay = formatTimeoffDate(day);
   return brandedMessage(REMINDER_AUTHOR, REMINDER_DESCRIPTION, {
       // Discord only notifies mentions in message content, not inside embeds.
-      content: `Missing donation proof for **${day}** (${timezone}):\n${ids.map(id => `<@${id}>`).join(' ')}`,
+      content: `Missing donation proof for **${displayDay}**\n${ids.map(id => `<@${id}>`).join(' ')}`,
       mentionUsers: ids,
       thumbnail: false,
     });
@@ -60,7 +62,8 @@ export function matchesReminder(message, day, batchIndex, batchIds) {
     // disjoint member IDs, so match the missed date and a member of this batch.
     return embed.author?.name === REMINDER_AUTHOR && embed.description === REMINDER_DESCRIPTION
       && embed.footer?.text === BRAND_FOOTER
-      && message.content?.startsWith(`Missing donation proof for **${day}** (`)
+      && (message.content?.startsWith(`Missing donation proof for **${formatTimeoffDate(day)}**\n`)
+        || message.content?.startsWith(`Missing donation proof for **${day}** (`))
       && batchIds.some(id => message.content.includes(`<@${id}>`));
   }));
 }

@@ -35,6 +35,8 @@ test('reminder content contains actual mentions and the embed stays within Disco
   const ids = Array.from({ length: 40 }, (_, i) => String(1532826238572298451n + BigInt(i)));
   const message = reminderMessage('2026-09-14', 'Europe/Paris', ids);
   const embed = message.embeds[0].toJSON();
+  assert.ok(message.content.startsWith('Missing donation proof for **14 Sep**\n'));
+  assert.equal(message.content.includes('Europe/Paris'), false);
   for (const id of ids) assert.ok(message.content.includes(`<@${id}>`));
   assert.deepEqual(message.allowedMentions.users, ids);
   assert.ok(message.content.length <= 2000);
