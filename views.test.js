@@ -84,6 +84,8 @@ test('donation report embeds keep proof links and all three member categories', 
   const report = { roster: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], submitted: [{ id: 'a' }],
     missing: [{ id: 'b' }], excused: [{ id: 'c' }], submissions: new Map([['a', 'https://discord.com/channels/1/2/3']]) };
   const message = donationView(report, '2026-09-14', '2026-09-14', 'Europe/Paris');
+  assert.match(message.embeds[0].data.description, /\*\*14 Sep\*\*/);
+  assert.doesNotMatch(message.embeds[0].data.description, /2026/);
   noTextCards(message);
   const description = message.embeds[0].toJSON().description;
   assert.match(description, /https:\/\/discord.com\/channels\/1\/2\/3/);
@@ -103,6 +105,9 @@ test('oversized entries split without losing content and invalid page indices ar
 test('new time-off request notice has approve and reject buttons without pinging the member', () => {
   const request = { id: 'abc123', userId: '12345678901234567', start: '2026-09-15', end: '2026-09-17', days: 3, reason: 'Holiday' };
   const message = timeoffRequestNotice(request);
+  const dates = message.embeds[0].data.fields.find(field => field.name === 'Dates').value;
+  assert.equal(dates, '15 Sep through 17 Sep');
+  assert.doesNotMatch(dates, /2026/);
   noTextCards(message);
   const embed = message.embeds[0].toJSON();
   assert.match(embed.description, /<@12345678901234567>/);

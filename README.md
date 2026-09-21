@@ -13,7 +13,7 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 
 ## Commands and the Discord admin panel
 
-On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its red **Create ticket** button opens a private form with the same values as `/timeoff`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
+On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its red **Vacation** button opens a private form with the same values as `/timeoff`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
 
 | Command | Who can use it | Purpose |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Members with role `1532826238572298451`, `1532826140086112256`, `153282677262476
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
-Member start dates use a day and three-letter English month, such as 16 Sep, in the current server-local year. YYYY-MM-DD is also accepted for explicit years. Past start dates are rejected. Periods include both the start and end date, and can last 1–365 days. Overlapping grants are allowed; any applicable grant excuses the member. Revoking a grant voids that entire grant, including in later historical reports. It does not cancel other overlapping grants. Admins can grant retroactive days off, but this cannot retract reminders already sent. Members can request today or future dates and have up to five pending requests.
+Member start dates accept the day before or after an abbreviated or full English month, such as `10 Sep`, `Sep 10`, or `10 September`. Past start dates are rejected. Periods include both the start and end date, and can last 1–365 days. Overlapping grants are allowed; any applicable grant excuses the member. Revoking a grant voids that entire grant, including in later historical reports. It does not cancel other overlapping grants. Admins can grant retroactive days off, but this cannot retract reminders already sent. Members can request today or future dates and have up to five pending requests.
 
 All command responses and the admin panel are private to the person using them. Members see approval or rejection through `/timeoff-status`; the bot does not send DMs. Only the end-of-day reminder intentionally pings members.
 

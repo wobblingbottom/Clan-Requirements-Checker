@@ -1,13 +1,14 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { listMessage, timeoffBlocks, issueBlocks } from './views.js';
+import { formatTimeoffDate } from './timeoff-date.js';
 
 export const commands = [
   new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addStringOption(o => o.setName('date').setDescription('YYYY-MM-DD; defaults to today')),
+    .addStringOption(o => o.setName('date').setDescription('Date, e.g. 10 Sep or Sep 10; defaults to today')),
   new SlashCommandBuilder().setName('timeoff').setDescription('Request days off from donation requirements')
-    .addStringOption(o => o.setName('start').setDescription('First day off: e.g. 16 Sep (current year)').setRequired(true))
+    .addStringOption(o => o.setName('start').setDescription('First day off: e.g. 10 Sep, Sep 10, or 10 September').setRequired(true))
     .addIntegerOption(o => o.setName('days').setDescription('Number of days, including the start date').setMinValue(1).setMaxValue(365).setRequired(true))
     .addStringOption(o => o.setName('reason').setDescription('Reason, visible only to you and admins').setMaxLength(500)),
   new SlashCommandBuilder().setName('timeoff-status').setDescription('View your time-off requests and approved dates'),
@@ -43,7 +44,7 @@ export function adminTimeoffView(store, today, timezone, page = 0) {
 }
 export function modal(action, today) {
   const specs = action === 'grant' ? [
-    ['user', 'Member Discord ID', 'Paste the member ID, not the role ID'], ['start', 'First day off (YYYY-MM-DD)', today], ['days', 'Number of days (1–365)', '1'],
+    ['user', 'Member Discord ID', 'Paste the member ID, not the role ID'], ['start', 'First day off (e.g. 10 Sep)', formatTimeoffDate(today)], ['days', 'Number of days (1–365)', '1'],
   ] : [[ 'id', action === 'revoke' ? 'Grant ID from the panel list' : 'Request ID from the panel list', '8-character ID' ]];
   return new ModalBuilder().setCustomId(`admin-submit:${action}`).setTitle({ grant: 'Grant days off', approve: 'Approve request', reject: 'Reject request', revoke: 'Revoke days off' }[action])
     .addComponents(specs.map(([id, label, placeholder]) => new ActionRowBuilder().addComponents(

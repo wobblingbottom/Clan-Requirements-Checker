@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown } from 'discord.js';
 import { brandedMessage } from './messages.js';
+import { formatTimeoffDate } from './timeoff-date.js';
 
 const safe = value => escapeMarkdown(String(value).replace(/[\r\n\t]/g, ' '));
 
@@ -44,10 +45,10 @@ export function timeoffBlocks(store, today, userId) {
   const grants = Object.values(store.data.grants).filter(g => !userId || g.userId === userId)
     .sort((a, b) => b.start.localeCompare(a.start));
   return [
-    ...(requests.length ? requests.map(r => `**Request \`${r.id}\` · ${safe(r.status)}**\n<@${r.userId}> · ${r.start} → ${r.end} · ${r.days} day(s)${r.reason ? `\nReason: ${safe(r.reason)}` : ''}`) : ['**Requests**\nNo time-off requests yet.']),
+    ...(requests.length ? requests.map(r => `**Request \`${r.id}\` · ${safe(r.status)}**\n<@${r.userId}> · ${formatTimeoffDate(r.start)} → ${formatTimeoffDate(r.end)} · ${r.days} day(s)${r.reason ? `\nReason: ${safe(r.reason)}` : ''}`) : ['**Requests**\nNo time-off requests yet.']),
     ...(grants.length ? grants.map(g => {
       const status = g.revokedAt ? 'Revoked' : g.end < today ? 'Expired' : g.start > today ? 'Scheduled' : 'Active';
-      return `**Days off \`${g.id}\` · ${status}**\n<@${g.userId}> · ${g.start} → ${g.end}\nApproved by <@${g.adminId}>`;
+      return `**Days off \`${g.id}\` · ${status}**\n<@${g.userId}> · ${formatTimeoffDate(g.start)} → ${formatTimeoffDate(g.end)}\nApproved by <@${g.adminId}>`;
     }) : ['**Approved days off**\nNo days off granted yet.']),
   ];
 }
@@ -74,7 +75,7 @@ export function timeoffRequestNotice(request, decision, adminId) {
   const message = brandedMessage('Crazyland clan vacation request.',
     `<@${request.userId}> requested time off.`, {
       fields: [
-        { name: 'Dates', value: `${request.start} through ${request.end}` },
+        { name: 'Dates', value: `${formatTimeoffDate(request.start)} through ${formatTimeoffDate(request.end)}` },
         { name: 'Days', value: String(request.days), inline: true },
         { name: 'Request ID', value: `\`${request.id}\``, inline: true },
         { name: 'Reason', value: safe(request.reason || 'No reason provided') },
@@ -102,7 +103,7 @@ export function donationView(report, day, today, timezone, page = 0) {
     ...(report.missing.length ? report.missing.map(m => `**Missing proof** · <@${m.id}>`) : ['**Missing proof**\nNobody is missing proof.']),
     ...(report.excused.length ? report.excused.map(m => `**Excused** · <@${m.id}>`) : ['**Excused**\nNo members on approved days off.']),
   ];
-  return listMessage('Crazyland clan donation report.', `**${day}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
+  return listMessage('Crazyland clan donation report.', `**${formatTimeoffDate(day)}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
     blocks, page, `report-page:${day}`, { fields: [
       { name: 'Submitted', value: String(report.submitted.length), inline: true },
       { name: 'Missing proof', value: String(report.missing.length), inline: true },

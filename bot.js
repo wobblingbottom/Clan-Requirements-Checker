@@ -7,7 +7,7 @@ import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
 import { checkAccess } from './access.js';
 import { brandedMessage } from './messages.js';
-import { parseTimeoffDate } from './timeoff-date.js';
+import { formatTimeoffDate, parseTimeoffDate } from './timeoff-date.js';
 import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
@@ -67,15 +67,15 @@ async function handleAdminSubmit(interaction, action) {
     const userId = get('user');
     if (!/^\d{17,20}$/.test(userId)) throw new Error('Enter the member Discord ID, not their name or a role ID.');
     await timeoffMember(userId);
-    const grant = store.grant(userId, get('start'), Number(get('days')), interaction.user.id);
-    response = `Granted ${grant.days} days off to <@${userId}>: **${grant.start} through ${grant.end}**. Grant ID: ${grant.id}.`;
+    const grant = store.grant(userId, parseTimeoffDate(get('start'), today()), Number(get('days')), interaction.user.id);
+    response = `Granted ${grant.days} days off to <@${userId}>: **${formatTimeoffDate(grant.start)} through ${formatTimeoffDate(grant.end)}**. Grant ID: ${grant.id}.`;
   } else if (action === 'approve') {
     const request = store.data.requests[get('id')];
     if (!request || request.status !== 'pending') throw new Error('Pending request not found.');
     await timeoffMember(request.userId);
     const grant = store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
     await updateRequestNotice(request, 'approved', interaction.user.id);
-    response = `Approved request ${request.id}: **${grant.start} through ${grant.end}**. Grant ID: ${grant.id}.`;
+    response = `Approved request ${request.id}: **${formatTimeoffDate(grant.start)} through ${formatTimeoffDate(grant.end)}**. Grant ID: ${grant.id}.`;
   } else if (action === 'reject') {
     const request = store.data.requests[get('id')];
     store.reject(get('id'), interaction.user.id);
@@ -221,7 +221,7 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.editReply(brandedMessage('Crazyland clan vacation request submitted.',
           'Your request is waiting for a Leader or Co-leader. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
             fields: [
-              { name: 'Dates', value: `${request.start} through ${request.end}` },
+              { name: 'Dates', value: `${formatTimeoffDate(request.start)} through ${formatTimeoffDate(request.end)}` },
               { name: 'Days off', value: String(days), inline: true },
               { name: 'Request ID', value: request.id, inline: true },
             ],
@@ -230,8 +230,9 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.commandName === 'timeoff-status' || (isButton && interaction.customId.startsWith('timeoff-page:'))) {
         return interaction.editReply(timeoffView(store, today(), timezone, interaction.user.id, page));
       }
-      const day = isButton ? interaction.customId.split(':')[1] : interaction.options.getString('date') || today();
-      if (!validDay(day) || day > today() || day < '2015-01-01') throw new Error('Use a real YYYY-MM-DD date from 2015 through today.');
+      const enteredDay = isButton ? interaction.customId.split(':')[1] : interaction.options.getString('date');
+      const day = enteredDay ? parseTimeoffDate(enteredDay, today()) : today();
+      if (!validDay(day) || day > today() || day < '2015-01-01') throw new Error('Use a real date from 2015 through today.');
       const report = await automation.report(day);
       return interaction.editReply(donationView(report, day, today(), timezone, page));
     });

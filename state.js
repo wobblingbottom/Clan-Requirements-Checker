@@ -19,7 +19,7 @@ export const canRequestTimeoff = member => !member.user.bot
 
 export function dateRange(start, days) {
   if (!validDay(start) || !Number.isInteger(days) || days < 1 || days > 365) {
-    throw new Error('Use a valid YYYY-MM-DD start date and 1–365 whole days.');
+    throw new Error('Use a valid start date and 1–365 whole days.');
   }
   const end = shiftDay(start, days - 1);
   if (!validDay(end) || start < '2015-01-01') throw new Error('Choose a date range between 2015 and 9999.');
