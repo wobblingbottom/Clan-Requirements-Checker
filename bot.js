@@ -12,6 +12,7 @@ import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, en
 
 const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
 const ADMIN_CHANNEL_ID = '1537173435611090944';
+const CHECK_EMOJI_ID = '1535935138142224435';
 const timezone = process.env.TIMEZONE || 'Europe/Paris';
 for (const [name, value] of Object.entries({ GUILD_ID, DONATION_CHANNEL_ID })) {
   if (!/^\d{17,20}$/.test(value || '')) throw new Error(`Set a valid ${name} in .env`);
@@ -152,7 +153,7 @@ client.on(Events.MessageCreate, async message => {
   try {
     await patient(message.author.id);
     schedule();
-    await message.react('📸');
+    await message.react(CHECK_EMOJI_ID);
   } catch (error) { console.error('Screenshot acknowledgement:', error.message); }
 });
 
