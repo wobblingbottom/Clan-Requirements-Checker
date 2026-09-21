@@ -229,6 +229,17 @@ test('large missing lists are split below Discord message and mention limits', a
   assert.equal(sent.flatMap(p => p.allowedMentions.users).length, 105);
   assert.ok(sent.every(p => p.content.length < 2000 && p.allowedMentions.users.length <= 40));
 });
+test('ten consecutive missing days move a member into the long-term reminder section', async t => {
+  const store = makeStore(t, '2026-09-01');
+  const { automation, sent } = fakeAutomation(t, store);
+  automation.report = async () => ({ missing: [member('long'), member('recent')] });
+  store.data.missingStreaks.long = 9;
+  await automation.closeDay('2026-09-01');
+  assert.match(sent[0].content, /Haven't donated for 10 or more days:\n<@long>/);
+  assert.match(sent[0].content, /Missing donation proof for \*\*1 Sep\*\*[\s\S]*<@recent>/);
+  assert.equal(store.data.missingStreaks.long, 10);
+  assert.equal(store.data.missingStreaks.recent, 1);
+});
 test('nickname checks clean up submitted, excused and former Patient members', async t => {
   const store = makeStore(t);
   const { automation } = fakeAutomation(t, store);

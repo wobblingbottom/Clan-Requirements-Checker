@@ -11,7 +11,7 @@ export function vacationNotice() {
     ...brandedMessage('Crazyland clan member vacations.',
       "If you'll be inactive for a few days, let the leadership team know by __creating a ticket__ using the button below. Include how long you expect to be away and, if possible, the reason for your absence.\n\n"
       + '**Member commands**\n'
-      + '`/timeoff` — Request days off with a start date (e.g. 10 Sep, Sep 10, or 10 September), number of days (1–365), and optional reason. You can also use the **Vacation** button.\n'
+      + '`/timeoff` — Request days off with a day and month, number of days (1–365), and optional reason. You can also use the **Vacation** button.\n'
       + '`/timeoff-status` — View your requests, approval status, and approved dates.\n\n'
       + 'Time off must be approved by a Leader or Co-leader before you are excused from donation requirements.'),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
@@ -21,7 +21,7 @@ export function vacationNotice() {
 
 export function vacationModal(today) {
   const fields = [
-    new TextInputBuilder().setCustomId('start').setLabel('Start date (e.g. 10 Sep or Sep 10)').setStyle(TextInputStyle.Short)
+    new TextInputBuilder().setCustomId('start').setLabel(`Start date (today: ${formatTimeoffDate(today)})`).setStyle(TextInputStyle.Short)
       .setRequired(true).setMinLength(5).setMaxLength(12).setValue(formatTimeoffDate(today)),
     new TextInputBuilder().setCustomId('days').setLabel('Number of days off (1–365)').setStyle(TextInputStyle.Short)
       .setRequired(true).setMaxLength(3),

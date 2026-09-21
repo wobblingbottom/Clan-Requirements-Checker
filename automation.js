@@ -81,8 +81,17 @@ export class Automation {
     let job = this.store.data.jobs[day];
     if (!job) {
       const ids = report.missing.map(m => m.id).sort();
+      const missing = new Set(ids);
+      for (const id of Object.keys(this.store.data.missingStreaks)) {
+        if (!missing.has(id)) delete this.store.data.missingStreaks[id];
+      }
+      for (const id of ids) this.store.data.missingStreaks[id] = (this.store.data.missingStreaks[id] || 0) + 1;
       job = { createdAt: this.now(), batches: [] };
-      for (let i = 0; i < ids.length; i += 40) job.batches.push({ ids: ids.slice(i, i + 40), sent: false });
+      for (let i = 0; i < ids.length; i += 40) {
+        const batchIds = ids.slice(i, i + 40);
+        job.batches.push({ ids: batchIds,
+          longTermIds: batchIds.filter(id => this.store.data.missingStreaks[id] >= 10), sent: false });
+      }
       this.store.data.jobs[day] = job;
       this.store.save();
     }
@@ -99,7 +108,7 @@ export class Automation {
       if (ids.length) {
         const nonce = createHash('sha256').update(`${this.guild.id}:${day}:${index}`).digest('hex').slice(0, 24);
         const message = await this.reminder.send({
-          ...reminderMessage(day, this.timezone, ids),
+          ...reminderMessage(day, this.timezone, ids, batch.longTermIds?.filter(id => stillMissing.has(id))),
           nonce, enforceNonce: true,
         });
         batch.sent = message.id;

@@ -55,3 +55,11 @@ test('simple reminders are recovered only for the matching date and member batch
   assert.equal(matchesReminder(message, '2026-09-15', 0, ['123']), false);
   assert.equal(matchesReminder(message, '2026-09-14', 1, ['789']), false);
 });
+
+test('reminder separates members missing proof for at least ten days', () => {
+  const ids = ['123', '456', '789'];
+  const message = reminderMessage('2026-09-20', 'Europe/Paris', ids, ['456', '789']);
+  assert.equal(message.content,
+    'Missing donation proof for **20 Sep**\n\n<@123>\n\nHaven\'t donated for 10 or more days:\n<@456> <@789>');
+  assert.deepEqual(message.allowedMentions.users, ids);
+});

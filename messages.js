@@ -44,11 +44,19 @@ export function brandedMessage(title, description, options = {}) {
   };
 }
 
-export function reminderMessage(day, timezone, ids) {
+export function reminderMessage(day, timezone, ids, longTermIds = []) {
   const displayDay = formatTimeoffDate(day);
+  const longTerm = new Set(longTermIds);
+  const recentIds = ids.filter(id => !longTerm.has(id));
+  const longIds = ids.filter(id => longTerm.has(id));
+  const sections = [
+    `Missing donation proof for **${displayDay}**`,
+    recentIds.map(id => `<@${id}>`).join(' '),
+  ];
+  if (longIds.length) sections.push(`Haven't donated for 10 or more days:\n${longIds.map(id => `<@${id}>`).join(' ')}`);
   return brandedMessage(REMINDER_AUTHOR, REMINDER_DESCRIPTION, {
       // Discord only notifies mentions in message content, not inside embeds.
-      content: `Missing donation proof for **${displayDay}**\n${ids.map(id => `<@${id}>`).join(' ')}`,
+      content: sections.filter(Boolean).join('\n\n'),
       mentionUsers: ids,
       thumbnail: false,
     });

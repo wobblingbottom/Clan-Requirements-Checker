@@ -55,10 +55,14 @@ export class Store {
           || !['requests', 'grants', 'nicknames', 'jobs'].every(k => this.data[k] && typeof this.data[k] === 'object')) {
         throw new Error('State is incompatible with this server/timezone. Restore a valid backup or migrate it before starting.');
       }
+      if (!this.data.missingStreaks || typeof this.data.missingStreaks !== 'object') {
+        this.data.missingStreaks = {};
+        this.save();
+      }
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
       this.data = { version: 1, guildId, timezone, lastClosedDay: shiftDay(today, -1),
-        requests: {}, grants: {}, nicknames: {}, jobs: {} };
+        requests: {}, grants: {}, nicknames: {}, jobs: {}, missingStreaks: {} };
       this.save();
     }
   }
