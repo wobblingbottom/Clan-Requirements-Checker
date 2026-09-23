@@ -11,6 +11,7 @@ export const TIMEOFF_ROLE_IDS = [
   '1532826889499185302',
 ];
 export const TAG = '[No Donation Proof]';
+export const VACATION_TAG = '[Vacation]';
 export const shiftDay = (day, offset) => new Date(Date.parse(`${day}T12:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
 export const isExcused = (state, userId, day) => Object.values(state.grants)
   .some(g => g.userId === userId && !g.revokedAt && g.start <= day && day <= g.end);
@@ -26,15 +27,15 @@ export function dateRange(start, days) {
   return { start, end, days };
 }
 
-export function taggedName(base) {
-  const clean = base.replace(/\s*\[No Donation Proof\]/g, '').trim() || 'Member';
+export function taggedName(base, tag = TAG) {
+  const clean = base.replace(/\s*\[(?:No Donation Proof|Vacation)\]/g, '').trim() || 'Member';
   // Discord limits nicknames to 32 characters. Save the full original separately.
   let prefix = '';
   for (const character of clean) {
-    if ((prefix + character).length > 32 - TAG.length - 1) break;
+    if ((prefix + character).length > 32 - tag.length - 1) break;
     prefix += character;
   }
-  return `${prefix.trimEnd()} ${TAG}`;
+  return `${prefix.trimEnd()} ${tag}`;
 }
 
 export function classify(members, submissions, state, day) {

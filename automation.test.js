@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Store, PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, TAG, dateRange, isExcused, canRequestTimeoff, classify, shiftDay, taggedName } from './state.js';
+import { Store, PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, TAG, VACATION_TAG, dateRange, isExcused, canRequestTimeoff, classify, shiftDay, taggedName } from './state.js';
 import { Automation, syncNickname } from './automation.js';
 import { commands, panel, modal } from './panel.js';
 
@@ -105,6 +105,17 @@ test('nickname cleanup restores null, preserves later edits and reports hierarch
   assert.equal(m.nickname, 'Edited');
   await assert.rejects(syncNickname(member('owner', { manageable: false }), true, store), /role hierarchy/);
 });
+test('approved time off applies Vacation and transitions cleanly between nickname states', async t => {
+  const store = makeStore(t);
+  const m = member('away', { nickname: 'Traveler' });
+  await syncNickname(m, false, store, true);
+  assert.equal(m.nickname, `Traveler ${VACATION_TAG}`);
+  await syncNickname(m, true, store, false);
+  assert.equal(m.nickname, `Traveler ${TAG}`);
+  await syncNickname(m, false, store, false);
+  assert.equal(m.nickname, 'Traveler');
+  assert.equal(store.data.nicknames.away, undefined);
+});
 
 function fakeAutomation(t, store) {
   const history = new Map();
@@ -132,7 +143,7 @@ test('midnight closes the previous local day once and skips pre-install days', a
   automation.syncToday = async () => {};
   await automation.tick();
   await automation.tick();
-  assert.deepEqual(dates, ['2026-09-14']);
+  assert.equal(dates.filter(day => day === '2026-09-14').length, 1);
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].allowedMentions, { parse: [], users: ['a'] });
   assert.ok(sent[0].content.endsWith('<@a>'));
@@ -232,13 +243,27 @@ test('large missing lists are split below Discord message and mention limits', a
 test('ten consecutive missing days move a member into the long-term reminder section', async t => {
   const store = makeStore(t, '2026-09-01');
   const { automation, sent } = fakeAutomation(t, store);
-  automation.report = async () => ({ missing: [member('long'), member('recent')] });
+  automation.report = async day => ({ missing: day === '2026-09-01'
+    ? [member('long'), member('recent')] : [member('long')] });
   store.data.missingStreaks.long = 9;
   await automation.closeDay('2026-09-01');
   assert.match(sent[0].content, /Haven't donated for 10 or more days:\n<@long>/);
   assert.match(sent[0].content, /Missing donation proof for \*\*1 Sep\*\*[\s\S]*<@recent>/);
   assert.equal(store.data.missingStreaks.long, 10);
   assert.equal(store.data.missingStreaks.recent, 1);
+});
+test('existing missing streaks are backfilled from nine prior proof reports', async t => {
+  const store = makeStore(t, '2026-09-21');
+  store.data.missingStreaks.long = 1; // Previous version started counting only at deployment.
+  const { automation, sent } = fakeAutomation(t, store);
+  automation.report = async day => ({ missing: day === '2026-09-21'
+    ? [member('long'), member('recent')]
+    : day >= '2026-09-12' ? [member('long')] : [] });
+  await automation.closeDay('2026-09-21');
+  assert.equal(store.data.missingStreaks.long, 10);
+  assert.equal(store.data.missingStreaks.recent, 1);
+  assert.match(sent[0].content, /Haven't donated for 10 or more days:\n<@long>/);
+  assert.match(sent[0].content, /<@recent>/);
 });
 test('nickname checks clean up submitted, excused and former Patient members', async t => {
   const store = makeStore(t);
@@ -249,7 +274,8 @@ test('nickname checks clean up submitted, excused and former Patient members', a
   store.grant('off', '2026-09-15', 1, 'admin');
   automation.report = async day => ({ ...classify(members, new Map([['done', 'proof']]), store.data, day), members });
   await automation.syncToday();
-  for (const id of ['done', 'off', 'former']) assert.equal(members.get(id).nickname, null);
+  for (const id of ['done', 'former']) assert.equal(members.get(id).nickname, null);
+  assert.equal(members.get('off').nickname, `Name-off ${VACATION_TAG}`);
   assert.ok(members.get('missing').nickname.endsWith(TAG));
 });
 test('slash commands, private admin panel and all modals serialize against installed Discord library', t => {

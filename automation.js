@@ -1,28 +1,32 @@
 import { dayAt, collectSubmissions } from './tracking.js';
-import { classify, shiftDay, taggedName, TAG } from './state.js';
+import { classify, shiftDay, taggedName, TAG, VACATION_TAG } from './state.js';
 import { createHash } from 'node:crypto';
 import { reminderMessage, matchesReminder } from './messages.js';
 
-export async function syncNickname(member, missing, store) {
+export async function syncNickname(member, missing, store, vacation = false) {
   let record = store.data.nicknames[member.id];
-  if (!missing && !record) return;
+  const tag = vacation ? VACATION_TAG : missing ? TAG : null;
+  if (!tag && !record) return;
   if (!member.manageable) throw new Error(`Cannot edit nickname for ${member.id}: check Manage Nicknames and role hierarchy.`);
-  if (missing) {
+  if (tag) {
     if (!record || (member.nickname !== record.applied && member.nickname !== record.original)) {
-      const original = member.nickname?.includes(TAG)
-        ? member.nickname.replace(/\s*\[No Donation Proof\]/g, '').trim() || null
+      const original = member.nickname?.includes(TAG) || member.nickname?.includes(VACATION_TAG)
+        ? member.nickname.replace(/\s*\[(?:No Donation Proof|Vacation)\]/g, '').trim() || null
         : member.nickname;
-      record = { original, applied: taggedName(member.displayName) };
-      store.data.nicknames[member.id] = record;
-      store.save(); // Persist original before the Discord mutation, including crash recovery.
+      record = { original };
     }
-    if (member.nickname !== record.applied) await member.setNickname(record.applied, 'Daily donation proof is missing');
+    const base = record.original || member.displayName;
+    record.applied = taggedName(base, tag);
+    store.data.nicknames[member.id] = record;
+    store.save(); // Persist original before the Discord mutation, including crash recovery.
+    if (member.nickname !== record.applied) await member.setNickname(record.applied,
+      vacation ? 'Approved vacation is active' : 'Daily donation proof is missing');
   } else {
     if (member.nickname === record.applied) {
       await member.setNickname(record.original, 'Donation proof received, time off, or Patient role removed');
-    } else if (member.nickname?.includes(TAG)) {
-      await member.setNickname(member.nickname.replace(/\s*\[No Donation Proof\]/g, '').trim() || null,
-        'Remove donation marker while preserving a changed nickname');
+    } else if (member.nickname?.includes(TAG) || member.nickname?.includes(VACATION_TAG)) {
+      await member.setNickname(member.nickname.replace(/\s*\[(?:No Donation Proof|Vacation)\]/g, '').trim() || null,
+        'Remove bot nickname marker while preserving a changed nickname');
     }
     delete store.data.nicknames[member.id];
     store.save();
@@ -63,9 +67,10 @@ export class Automation {
     const today = dayAt(this.now(), this.timezone);
     const report = await this.report(today);
     const missing = new Set(report.missing.map(m => m.id));
+    const vacation = new Set(report.excused.map(m => m.id));
     this.nicknameErrors = [];
     for (const member of report.members.values()) {
-      try { await syncNickname(member, missing.has(member.id), this.store); }
+      try { await syncNickname(member, missing.has(member.id), this.store, vacation.has(member.id)); }
       catch (error) { this.nicknameErrors.push(error.message); }
     }
     // Members who left cannot have their old server nickname restored.
@@ -82,10 +87,25 @@ export class Automation {
     if (!job) {
       const ids = report.missing.map(m => m.id).sort();
       const missing = new Set(ids);
+      // Seed new members (and installations upgraded from the counter-only
+      // version) from actual proof history instead of waiting ten new days.
+      const needsHistory = new Set(ids.filter(id => !this.store.data.missingStreaks[id]
+        || !this.store.data.missingStreaksBackfilled));
+      const historicalStreaks = Object.fromEntries([...needsHistory].map(id => [id, 1]));
+      for (let offset = 1; offset < 10 && needsHistory.size; offset++) {
+        const previous = await this.report(shiftDay(day, -offset));
+        const previousMissing = new Set(previous.missing.map(m => m.id));
+        for (const id of needsHistory) {
+          if (previousMissing.has(id)) historicalStreaks[id]++;
+          else needsHistory.delete(id);
+        }
+      }
       for (const id of Object.keys(this.store.data.missingStreaks)) {
         if (!missing.has(id)) delete this.store.data.missingStreaks[id];
       }
-      for (const id of ids) this.store.data.missingStreaks[id] = (this.store.data.missingStreaks[id] || 0) + 1;
+      for (const id of ids) this.store.data.missingStreaks[id] = id in historicalStreaks
+        ? historicalStreaks[id] : this.store.data.missingStreaks[id] + 1;
+      this.store.data.missingStreaksBackfilled = true;
       job = { createdAt: this.now(), batches: [] };
       for (let i = 0; i < ids.length; i += 40) {
         const batchIds = ids.slice(i, i + 40);

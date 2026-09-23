@@ -7,7 +7,7 @@ Checks only human members with the **Patient** role, ID `1532826238572298451`, f
 - Every minute, the bot checks today's donation-channel history. Missing members get ` [No Donation Proof]` appended to their server nickname. This means the label appears from the beginning of each day until proof is posted.
 - An image upload triggers another check and receives the server's custom `check` emoji reaction. The label is removed after proof is found, while approved time off applies, or after the Patient role is removed.
 - Shortly after midnight, the bot **pings yesterday's missing members in the donation channel**, explicitly naming the missed date. Approved days off for that date exclude members from the ping list. The new day's proof does not count for yesterday.
-- Members on approved time off appear as **Excused** in reports. Pending requests do not excuse them. Requirements resume automatically the day after their last approved day off.
+- Members on approved time off receive `[Vacation]` on their nickname and appear as **Excused** in reports. Pending requests do not excuse them. Their original nickname is restored—or changed to `[No Donation Proof]` if needed—when the vacation ends.
 
 The bot checks that an image was uploaded. Officers still need to verify that the image proves the donation and meets the required amount.
 
