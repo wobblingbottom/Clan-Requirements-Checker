@@ -2,6 +2,7 @@ import { dayAt, collectSubmissions } from './tracking.js';
 import { classify, shiftDay, taggedName, TAG, VACATION_TAG } from './state.js';
 import { createHash } from 'node:crypto';
 import { reminderMessage, matchesReminder } from './messages.js';
+import { fetchMembers } from './members.js';
 
 export async function syncNickname(member, missing, store, vacation = false) {
   let record = store.data.nicknames[member.id];
@@ -59,7 +60,7 @@ export class Automation {
   }
   async report(day) {
     const [members, submissions] = await Promise.all([
-      this.guild.members.fetch(), collectSubmissions(this.channel, day, this.timezone),
+      fetchMembers(this.guild), collectSubmissions(this.channel, day, this.timezone),
     ]);
     return { ...classify(members, submissions, this.store.data, day), members, submissions };
   }
