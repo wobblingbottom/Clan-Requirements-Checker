@@ -14,6 +14,7 @@ import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } 
 import { getSettings, validateSettings, saveSettings, isFormerMember } from './configuration.js';
 import { SetupSessions, setupView } from './setup.js';
 import { DonationBreakManager } from './donation-breaks.js';
+import { assignMemberRoles } from './member-roles.js';
 import { breakModal, breaksView, BREAK_MODAL } from './break-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID } = process.env;
@@ -129,7 +130,8 @@ async function applyConfiguration(channels) {
   adminChannel = channels.adminChannelId;
   if (automation) Object.assign(automation, { channel: channels.donationChannelId, reminder: channels.reminderChannelId });
   else automation = new Automation({ guild: configuredGuild, channel: channels.donationChannelId,
-    reminder: channels.reminderChannelId, store, timezone, botId: client.user.id });
+    reminder: channels.reminderChannelId, store, timezone, botId: client.user.id,
+    syncMemberRoles: () => assignMemberRoles(configuredGuild, settings()) });
   configurationError = null;
   const oldNotice = store.data.vacationPanel ? { ...store.data.vacationPanel } : null;
   try {
@@ -194,8 +196,13 @@ client.once(Events.ClientReady, async () => {
   }
 });
 
+client.on(Events.GuildMemberAdd, member => {
+  if (member.guild.id === GUILD_ID && !member.user.bot) schedule();
+});
 client.on(Events.GuildMemberUpdate, (previous, member) => {
-  if (member.guild.id === GUILD_ID && isFormerMember(previous, settings()) !== isFormerMember(member, settings())) schedule();
+  const config = settings();
+  if (member.guild.id === GUILD_ID && (isFormerMember(previous, config) !== isFormerMember(member, config)
+      || previous.roles.cache.has(config.memberRoleId) !== member.roles.cache.has(config.memberRoleId))) schedule();
 });
 
 client.on(Events.MessageCreate, async message => {

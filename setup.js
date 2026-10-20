@@ -53,7 +53,7 @@ export function setupView(session, status = '') {
   return {
     ...brandedMessage('Crazyland clan setup.',
       'Choose a setting, then select its channel or roles below. Changes take effect when you press **Save setup**.\n\n'
-      + 'The member role controls donation tracking. Members, leaders and additional time-off roles can request vacations. Leadership roles can approve them.\n'
+      + 'The member role is automatically assigned to human users who lack it, except those marked no longer a member. Members, leaders and additional time-off roles can request vacations. Leadership roles can approve them.\n'
       + 'The no-longer-a-member role overrides membership, stops donation tracking and removes bot nickname tags.\n'
       + 'Saving posts or updates the Vacation notice in your chosen channel.\n' + status.slice(0, 1200), { fields }),
     attachments: [],

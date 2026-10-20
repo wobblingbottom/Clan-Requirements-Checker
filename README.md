@@ -34,6 +34,8 @@ Use **/clan → action: Setup** as a server administrator. Choose a setting, pic
 - **Leader / approval roles:** one or more roles allowed to approve time off. Server Administrator alone does not grant approval authority unless the admin also has a chosen leadership role.
 - **Additional time-off roles:** optional extra roles that may request vacations. Tracked members and leaders can already request time off.
 
+The tracked member role is automatically added to human users who lack it, including existing users on startup and new joins. Bots and anyone manually given the no-longer-a-member role are skipped. No former-member roles are assigned or removed automatically. The bot needs Manage Roles and a role above the tracked member role; assignment failures appear in the admin panel and retry on later checks. Automatic assignment rejects roles with Administrator or Manage Roles.
+
 Saved choices take effect immediately and survive restarts in the persistent state file. They override the original channel and role defaults described below. Existing requests, grants and reminder progress are preserved. Channel permissions and selected roles are checked before saving. If a configured channel or role is deleted, Setup remains available to repair it.
 
 ## Commands and the Discord admin panel

@@ -57,24 +57,25 @@ async function findReminder(channel, day, batchIndex, batchIds, since, botId) {
 }
 
 export class Automation {
-  constructor({ guild, channel, reminder, store, timezone, botId, now = () => Date.now() }) {
-    Object.assign(this, { guild, channel, reminder, store, timezone, botId, now });
+  constructor({ guild, channel, reminder, store, timezone, botId, syncMemberRoles, now = () => Date.now() }) {
+    Object.assign(this, { guild, channel, reminder, store, timezone, botId, syncMemberRoles, now });
     this.nicknameErrors = [];
     this.lastError = null;
     this.lastCheck = null;
   }
-  async report(day) {
+  async report(day, roster) {
     const [members, submissions] = await Promise.all([
-      fetchMembers(this.guild), collectSubmissions(this.channel, day, this.timezone),
+      roster ?? fetchMembers(this.guild), collectSubmissions(this.channel, day, this.timezone),
     ]);
     return { ...classify(members, submissions, this.store.data, day), members, submissions };
   }
   async syncToday() {
     const today = dayAt(this.now(), this.timezone);
-    const report = await this.report(today);
+    const roleSync = await this.syncMemberRoles?.();
+    const report = await this.report(today, roleSync?.members);
     const missing = new Set(report.missing.map(m => m.id));
     const vacation = new Set(report.excused.filter(m => !report.pause || isExcused(this.store.data, m.id, today)).map(m => m.id));
-    this.nicknameErrors = [];
+    this.nicknameErrors = [...(roleSync?.errors || [])];
     const settings = getSettings(this.store.data);
     for (const member of report.members.values()) {
       try { await syncNickname(member, missing.has(member.id), this.store, vacation.has(member.id), isFormerMember(member, settings)); }
