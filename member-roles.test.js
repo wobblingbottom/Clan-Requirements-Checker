@@ -67,3 +67,37 @@ test('today tracking immediately uses the SDK member clone after successful assi
   assert.deepEqual(report.missing.map(m => m.id), ['new']);
   assert.match(report.members.get('new').nickname, /\[No Donation Proof\]/);
 });
+
+
+test('former role removes conflicting member role, preserves other roles and retries failures', async () => {
+  const f = fixture();
+  const former = f.make('former', [f.config.memberRoleId, f.config.formerMemberRoleId, 'other']);
+  let attempts = 0;
+  former.roles.remove = async roleId => {
+    attempts++;
+    if (attempts === 1) throw Error('Missing Permissions');
+    assert.equal(roleId, f.config.memberRoleId);
+    return f.make('former', [f.config.formerMemberRoleId, 'other']);
+  };
+  f.members.set('former', former);
+  f.members.set('new', f.make('new'));
+  let result = await assignMemberRoles(f.guild, f.config);
+  assert.match(result.errors[0], /remove member role from former: Missing Permissions/);
+  assert.deepEqual(f.assigned, [['new', f.config.memberRoleId]]);
+  result = await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual([...result.members.get('former').roles.cache.keys()], [f.config.formerMemberRoleId, 'other']);
+  assert.equal(attempts, 2);
+});
+
+test('privileged member role can be removed but never automatically granted', async () => {
+  const f = fixture(); f.role.permissions = new PermissionsBitField(P.Administrator);
+  const former = f.make('former', [f.config.memberRoleId, f.config.formerMemberRoleId]);
+  let removed = false;
+  former.roles.remove = async () => { removed = true; return f.make('former', [f.config.formerMemberRoleId]); };
+  f.members.set('former', former); f.members.set('new', f.make('new'));
+  const result = await assignMemberRoles(f.guild, f.config);
+  assert.equal(removed, true);
+  assert.equal(result.errors.length, 1);
+  assert.deepEqual(f.assigned, []);
+});
