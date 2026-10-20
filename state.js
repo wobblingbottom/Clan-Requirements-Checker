@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validDay } from './tracking.js';
+import { breakForDay } from './break-state.js';
 import { getSettings, defaultSettings, requestRoleIds } from './configuration.js';
 
 export const PATIENT_ROLE_ID = '1532826238572298451';
@@ -42,9 +43,10 @@ export function taggedName(base, tag = TAG) {
 export function classify(members, submissions, state, day) {
   const memberRoleId = getSettings(state).memberRoleId;
   const roster = [...members.values()].filter(m => !m.user.bot && m.roles.cache.has(memberRoleId));
-  const excused = roster.filter(m => isExcused(state, m.id, day));
-  const required = roster.filter(m => !isExcused(state, m.id, day));
-  return { roster, excused, submitted: required.filter(m => submissions.has(m.id)),
+  const pause = breakForDay(state, day);
+  const excused = roster.filter(m => pause || isExcused(state, m.id, day));
+  const required = roster.filter(m => !pause && !isExcused(state, m.id, day));
+  return { roster, excused, pause, submitted: required.filter(m => submissions.has(m.id)),
     missing: required.filter(m => !submissions.has(m.id)) };
 }
 

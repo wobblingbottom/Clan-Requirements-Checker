@@ -11,6 +11,16 @@ Checks only human members with the **Patient** role, ID `1532826238572298451`, f
 
 The bot checks that an image was uploaded. Officers still need to verify that the image proves the donation and meets the required amount.
 
+## Donation breaks
+
+Use **/clan → action: Donation breaks** as a server administrator, then **Create break**. Enter a name (for example, Halloween break), inclusive start and end dates, and an optional announcement. Dates use the bot timezone; ISO dates such as `2026-10-30` or short dates such as `30 Oct` work. Breaks can last up to 365 days. Non-overlapping future breaks can be scheduled.
+
+Creating a break posts one announcement in the configured donation proof channel. A future break is announced immediately and locks the channel when its start date arrives. The announcement updates when the break starts or finishes. Regular members can read but cannot post messages or create/post in threads during the break. Discord server owners and administrators bypass channel permission overwrites and can still post. No mass mention is sent.
+
+Donation requirements, missing-proof labels and reminders pause during the break. Existing individual vacation labels still apply. Break dates stay excused in historical reports, so there are no catch-up reminders or missing-streak increments for them. Regular tracking resumes after the final date. Ending a break early unlocks the channel immediately but keeps the current date excused. Use **Cancel next break** to cancel a future break, or **End current break** to finish an active one.
+
+The bot needs **Manage Permissions (Manage Roles)** in the donation channel, plus its normal read/send/embed/attachment permissions. Original posting overwrites are saved before locking and restored when the break ends, including after a restart. Unrelated permission changes are preserved. Failed channel updates are shown in the break panel and retried each minute. Keep the bot running and its data volume persistent; an expired break cannot unlock a channel while the bot is offline. Finish or cancel pending breaks before changing the donation proof channel in Setup.
+
 ## Server setup
 
 Use **/clan → action: Setup** as a server administrator. Choose a setting, pick its channel or roles in the native Discord selector, then press **Save setup**. **Cancel** discards unsaved edits. The panel is private, expires after 30 minutes, and rejects stale saves if another admin has changed setup.
@@ -37,6 +47,7 @@ On startup the bot posts the branded member vacations notice in channel `1549128
 | `/clan action:My time off` | Members | View their own requests and approved dates |
 | `/clan action:Admin panel` | Administrator | Open the private admin panel |
 | `/clan action:Setup` | Administrator | Choose channels and member / leadership roles |
+| `/clan action:Donation breaks` | Administrator | Schedule a break, announce it and temporarily lock donation posting |
 
 The `/clan action:Admin panel` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
 

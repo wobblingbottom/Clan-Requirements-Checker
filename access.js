@@ -16,13 +16,13 @@ export function checkAccess(interaction, guildId, settings = defaultSettings()) 
     }
     return;
   }
-  const admin = action === 'setup' || interaction.customId?.startsWith('setup:')
+  const admin = action === 'breaks' || interaction.customId?.startsWith('breaks:') || action === 'setup' || interaction.customId?.startsWith('setup:')
     || interaction.customId?.startsWith('admin:')
     || interaction.customId?.startsWith('admin-submit:')
     || interaction.customId?.startsWith('timeoff-review:')
     || action === 'donation-admin';
   if (admin && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-    throw new Error('Only server administrators can manage setup and days off.');
+    throw new Error('Only server administrators can manage clan settings, donation breaks and days off.');
   }
   if ((action === 'donations' || interaction.customId?.startsWith('report-page:'))
       && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {

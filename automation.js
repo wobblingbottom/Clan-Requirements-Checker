@@ -1,8 +1,9 @@
 import { dayAt, collectSubmissions } from './tracking.js';
-import { classify, shiftDay, taggedName, TAG, VACATION_TAG } from './state.js';
+import { classify, shiftDay, taggedName, TAG, VACATION_TAG, isExcused } from './state.js';
 import { createHash } from 'node:crypto';
 import { reminderMessage, matchesReminder } from './messages.js';
 import { fetchMembers } from './members.js';
+import { breakForDay, activeBreak } from './break-state.js';
 
 export async function syncNickname(member, missing, store, vacation = false) {
   let record = store.data.nicknames[member.id];
@@ -68,7 +69,7 @@ export class Automation {
     const today = dayAt(this.now(), this.timezone);
     const report = await this.report(today);
     const missing = new Set(report.missing.map(m => m.id));
-    const vacation = new Set(report.excused.map(m => m.id));
+    const vacation = new Set(report.excused.filter(m => !report.pause || isExcused(this.store.data, m.id, today)).map(m => m.id));
     this.nicknameErrors = [];
     for (const member of report.members.values()) {
       try { await syncNickname(member, missing.has(member.id), this.store, vacation.has(member.id)); }
@@ -83,6 +84,12 @@ export class Automation {
     return report;
   }
   async closeDay(day) {
+    if (breakForDay(this.store.data, day)) {
+      this.store.data.lastClosedDay = day;
+      delete this.store.data.jobs[day];
+      this.store.save();
+      return;
+    }
     const report = await this.report(day);
     let job = this.store.data.jobs[day];
     if (!job) {
@@ -93,7 +100,9 @@ export class Automation {
       const needsHistory = new Set(ids.filter(id => !this.store.data.missingStreaks[id]
         || !this.store.data.missingStreaksBackfilled));
       const historicalStreaks = Object.fromEntries([...needsHistory].map(id => [id, 1]));
-      for (let offset = 1; offset < 10 && needsHistory.size; offset++) {
+      for (let offset = 1, checked = 0; checked < 9 && needsHistory.size && offset < 3660; offset++) {
+        if (breakForDay(this.store.data, shiftDay(day, -offset))) continue;
+        checked++;
         const previous = await this.report(shiftDay(day, -offset));
         const previousMissing = new Set(previous.missing.map(m => m.id));
         for (const id of needsHistory) {
@@ -144,8 +153,9 @@ export class Automation {
     const errors = [];
     try {
       const yesterday = shiftDay(dayAt(this.now(), this.timezone), -1);
+      const pausedToday = activeBreak(this.store.data, dayAt(this.now(), this.timezone));
       // Catch up after downtime, bounded per tick to keep the bot responsive.
-      for (let n = 0; n < 7 && this.store.data.lastClosedDay < yesterday; n++) {
+      for (let n = 0; n < 7 && !pausedToday && this.store.data.lastClosedDay < yesterday; n++) {
         await this.closeDay(shiftDay(this.store.data.lastClosedDay, 1));
       }
     } catch (error) { errors.push(error); }

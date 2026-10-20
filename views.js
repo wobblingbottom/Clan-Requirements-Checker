@@ -103,7 +103,7 @@ export function donationView(report, day, today, timezone, page = 0) {
     ...(report.missing.length ? report.missing.map(m => `**Missing proof** · <@${m.id}>`) : ['**Missing proof**\nNobody is missing proof.']),
     ...(report.excused.length ? report.excused.map(m => `**Excused** · <@${m.id}>`) : ['**Excused**\nNo members on approved days off.']),
   ];
-  return listMessage('Crazyland clan donation report.', `**${formatTimeoffDate(day)}** · ${timezone}\nTracking **${report.roster.length}** current Patient members.${day === today ? '\nToday is still in progress.' : ''}`,
+  return listMessage('Crazyland clan donation report.', `**${formatTimeoffDate(day)}** · ${timezone}\nTracking **${report.roster.length}** current members.${report.pause ? `\nDonations paused: **${safe(report.pause.name)}**.` : ''}${day === today ? '\nToday is still in progress.' : ''}`,
     blocks, page, `report-page:${day}`, { fields: [
       { name: 'Submitted', value: String(report.submitted.length), inline: true },
       { name: 'Missing proof', value: String(report.missing.length), inline: true },

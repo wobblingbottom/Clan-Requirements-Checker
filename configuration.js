@@ -1,4 +1,5 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { donationBreaks } from './break-state.js';
 
 export function defaultSettings() {
   const donation = process.env.DONATION_CHANNEL_ID || '1535655837828382740';
@@ -77,6 +78,10 @@ export function saveSettings(store, settings, expectedRevision) {
     throw new Error('Another admin changed setup. Open Setup again to use the latest settings.');
   }
   const normalized = normalizeSettings(settings);
+  if (normalized.donationChannelId !== getSettings(store.data).donationChannelId
+      && donationBreaks(store.data).some(item => !item.finished)) {
+    throw new Error('End or cancel donation breaks and restore the channel before changing the donation proof channel.');
+  }
   const previous = { settings: store.data.settings, revision: store.data.settingsRevision, requests: store.data.requests };
   const oldChannel = getSettings(store.data).adminChannelId;
   // Keep pending approvals usable after the review channel moves.

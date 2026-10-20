@@ -13,6 +13,8 @@ import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } 
 
 import { getSettings, validateSettings, saveSettings } from './configuration.js';
 import { SetupSessions, setupView } from './setup.js';
+import { DonationBreakManager } from './donation-breaks.js';
+import { breakModal, breaksView, BREAK_MODAL } from './break-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID } = process.env;
 const CHECK_EMOJI_ID = '1535935138142224435';
@@ -33,6 +35,7 @@ let store;
 let timer;
 let adminChannel;
 let configuredGuild;
+let breakManager;
 let configurationError = null;
 const setupSessions = new SetupSessions();
 const settings = () => getSettings(store?.data);
@@ -44,9 +47,14 @@ const serialize = action => {
 };
 let tickQueued = false;
 const schedule = () => {
-  if (!automation || tickQueued) return;
+  if ((!automation && !breakManager) || tickQueued) return;
   tickQueued = true;
-  void serialize(() => automation.tick()).catch(error => console.error('Daily check failed:', error.message))
+  void serialize(async () => {
+    const errors = [];
+    try { await breakManager?.sync(); } catch (error) { errors.push(error.message); }
+    try { if (automation) await automation.tick(); } catch (error) { errors.push(error.message); }
+    if (errors.length) { const message = errors.join('; '); if (automation) automation.lastError = message; throw new Error(message); }
+  }).catch(error => console.error('Daily check failed:', error.message))
     .finally(() => { tickQueued = false; });
 };
 async function patient(userId) {
@@ -171,6 +179,7 @@ client.once(Events.ClientReady, async () => {
   try {
     configuredGuild = await client.guilds.fetch(GUILD_ID);
     store = new Store(fileURLToPath(new URL('./data/state.json', import.meta.url)), today(), GUILD_ID, timezone);
+    breakManager = new DonationBreakManager({ guild: configuredGuild, store, botId: client.user.id, timezone });
     // Keep Setup available even if a configured channel or role was deleted.
     await registerCommands(configuredGuild);
     try { await applyConfiguration(await validateSettings(configuredGuild, settings())); }
@@ -196,16 +205,44 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+  const isBreakSubmit = interaction.isModalSubmit() && interaction.customId === BREAK_MODAL;
+  const isBreakButton = interaction.isButton() && interaction.customId.startsWith('breaks:');
   const isSetup = interaction.isMessageComponent() && interaction.customId.startsWith('setup:');
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
   const isButton = interaction.isButton() && (interaction.customId === VACATION_BUTTON || ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix)));
   const isVacationSubmit = interaction.isModalSubmit() && [VACATION_MODAL, CLAN_TIMEOFF_MODAL].includes(interaction.customId);
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
-  if (!isCommand && !isButton && !isModal && !isVacationSubmit && !isSetup) return;
+  if (!isCommand && !isButton && !isModal && !isVacationSubmit && !isSetup && !isBreakButton && !isBreakSubmit) return;
   try {
     if (!store || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
     checkAccess(interaction, GUILD_ID, settings());
     const action = commandAction(interaction);
+    if (isBreakButton && interaction.customId === 'breaks:create') {
+      await interaction.showModal(breakModal(today()));
+      return;
+    }
+    if ((isCommand && action === 'breaks') || isBreakButton || isBreakSubmit) {
+      if (isBreakButton) await interaction.deferUpdate();
+      else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await serialize(async () => {
+        checkAccess(interaction, GUILD_ID, settings());
+        let status = '';
+        if (isBreakSubmit) {
+          const get = id => interaction.fields.getTextInputValue(id).trim();
+          await breakManager.create({ name: get('name'), start: parseTimeoffDate(get('start'), today()),
+            end: parseTimeoffDate(get('end'), today()), reason: get('reason'), adminId: interaction.user.id });
+          status = 'Break saved.';
+        } else if (isBreakButton && interaction.customId.startsWith('breaks:end:')) {
+          breakManager.end(interaction.customId.split(':')[2], interaction.user.id);
+          status = 'Break ending or cancelled. Today remains excused if the break had already started.';
+        }
+        try { await breakManager.sync(); }
+        catch (error) { status += '\nChannel update pending: ' + error.message + ' The bot will retry automatically.'; }
+        schedule();
+        await interaction.editReply(breaksView(store.data, today(), timezone, status));
+      });
+      return;
+    }
     if (isSetup) {
       await interaction.deferUpdate();
       await serialize(() => handleSetup(interaction));
