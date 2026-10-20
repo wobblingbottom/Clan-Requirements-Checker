@@ -9,14 +9,14 @@ const interaction = action => ({ guildId: 'server', commandName: 'clan', options
   getString: (name, required) => { assert.equal(name, 'action'); assert.equal(required, true); return action; },
 } });
 
-test('one clan command exposes four action choices and an optional report date', () => {
+test('one clan command exposes five action choices and an optional report date', () => {
   assert.equal(commands.length, 1);
   const command = commands[0].toJSON();
   assert.equal(command.name, 'clan');
   assert.equal(command.default_member_permissions, undefined);
   assert.equal(command.options[0].name, 'action');
   assert.equal(command.options[0].required, true);
-  assert.deepEqual(command.options[0].choices.map(c => c.name), ['Donation report', 'Request time off', 'My time off', 'Admin panel']);
+  assert.deepEqual(command.options[0].choices.map(c => c.name), ['Donation report', 'Request time off', 'My time off', 'Admin panel', 'Setup']);
   assert.equal(command.options[1].name, 'date');
   assert.ok(!command.options[1].required);
   for (const choice of command.options[0].choices) assert.equal(commandAction(interaction(choice.value)), choice.value);

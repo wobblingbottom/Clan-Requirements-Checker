@@ -13,7 +13,7 @@ export function vacationNotice() {
       + '**Member commands**\n'
       + '`/clan action:Request time off` — Request days off with a day and month, number of days (1–365), and optional reason. You can also use the **Vacation** button.\n'
       + '`/clan action:My time off` — View your requests, approval status, and approved dates.\n\n'
-      + 'Time off must be approved by a Leader or Co-leader before you are excused from donation requirements.'),
+      + 'Time off must be approved by a member of the configured leadership roles before you are excused from donation requirements.'),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
       .setCustomId(VACATION_BUTTON).setLabel('Vacation').setStyle(ButtonStyle.Danger))],
   };

@@ -7,6 +7,7 @@ export const ACTIONS = [
   { name: 'Request time off', value: 'timeoff' },
   { name: 'My time off', value: 'timeoff-status' },
   { name: 'Admin panel', value: 'donation-admin' },
+  { name: 'Setup', value: 'setup' },
 ];
 export const commands = [new SlashCommandBuilder()
   .setName('clan').setDescription('Donation reports and member time off')

@@ -1,7 +1,7 @@
-import { Client, GatewayIntentBits, Events, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, Events, MessageFlags } from 'discord.js';
 import { fileURLToPath } from 'node:url';
 import { dayAt, validDay, hasImage, latestScreenshot } from './tracking.js';
-import { PATIENT_ROLE_ID, TIMEOFF_ROLE_IDS, canRequestTimeoff, Store, dateRange } from './state.js';
+import { canRequestTimeoff, Store, dateRange } from './state.js';
 import { Automation } from './automation.js';
 import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
@@ -9,13 +9,15 @@ import { checkAccess } from './access.js';
 import { commandAction, registerCommands, CLAN_TIMEOFF_MODAL } from './command-menu.js';
 import { brandedMessage } from './messages.js';
 import { formatTimeoffDate, parseTimeoffDate } from './timeoff-date.js';
-import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
+import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
-const { DISCORD_TOKEN, GUILD_ID, DONATION_CHANNEL_ID } = process.env;
-const ADMIN_CHANNEL_ID = '1537173435611090944';
+import { getSettings, validateSettings, saveSettings } from './configuration.js';
+import { SetupSessions, setupView } from './setup.js';
+
+const { DISCORD_TOKEN, GUILD_ID } = process.env;
 const CHECK_EMOJI_ID = '1535935138142224435';
 const timezone = process.env.TIMEZONE || 'Europe/Paris';
-for (const [name, value] of Object.entries({ GUILD_ID, DONATION_CHANNEL_ID })) {
+for (const [name, value] of Object.entries({ GUILD_ID })) {
   if (!/^\d{17,20}$/.test(value || '')) throw new Error(`Set a valid ${name} in .env`);
 }
 if (!DISCORD_TOKEN || DISCORD_TOKEN === 'put_your_bot_token_here') throw new Error('Set DISCORD_TOKEN in .env');
@@ -30,6 +32,10 @@ let automation;
 let store;
 let timer;
 let adminChannel;
+let configuredGuild;
+let configurationError = null;
+const setupSessions = new SetupSessions();
+const settings = () => getSettings(store?.data);
 let queue = Promise.resolve();
 const serialize = action => {
   const result = queue.then(action);
@@ -45,18 +51,19 @@ const schedule = () => {
 };
 async function patient(userId) {
   const member = await automation.guild.members.fetch(userId);
-  if (member.user.bot || !member.roles.cache.has(PATIENT_ROLE_ID)) throw new Error('This member must have the Patient role.');
+  if (member.user.bot || !member.roles.cache.has(settings().memberRoleId)) throw new Error('This member must have the configured member role.');
   return member;
 }
 async function timeoffMember(userId) {
   const member = await automation.guild.members.fetch(userId);
-  if (!canRequestTimeoff(member)) throw new Error('This member does not have a role that can request time off.');
+  if (!canRequestTimeoff(member, settings())) throw new Error('This member does not have a role that can request time off.');
   return member;
 }
 async function updateRequestNotice(request, decision, adminId) {
   if (!request.noticeMessageId) return;
   try {
-    const message = await adminChannel.messages.fetch(request.noticeMessageId);
+    const channel = await configuredGuild.channels.fetch(request.noticeChannelId || settings().adminChannelId);
+    const message = await channel.messages.fetch(request.noticeMessageId);
     await message.edit(timeoffRequestNotice(request, decision, adminId));
   } catch (error) {
     console.error(`Could not update time-off request message ${request.id}:`, error.message);
@@ -94,11 +101,13 @@ async function handleAdminSubmit(interaction, action) {
 async function handleTimeoffReview(interaction) {
   const [, action, requestId] = interaction.customId.split(':');
   if (!['approve', 'reject'].includes(action)) throw new Error('Unknown review action.');
-  if (interaction.channelId !== ADMIN_CHANNEL_ID || interaction.message.author.id !== client.user.id) {
-    throw new Error('This review button is not from the configured admin channel.');
-  }
   const request = store.data.requests[requestId];
   if (!request || request.status !== 'pending') throw new Error('This request has already been reviewed or no longer exists.');
+  if (interaction.channelId !== (request.noticeChannelId || settings().adminChannelId)
+      || interaction.message.author.id !== client.user.id
+      || (request.noticeMessageId && interaction.message.id !== request.noticeMessageId)) {
+    throw new Error('This review button is not the saved request message.');
+  }
   await timeoffMember(request.userId);
   if (action === 'approve') store.grant(request.userId, request.start, request.days, interaction.user.id, request.id);
   else store.reject(request.id, interaction.user.id);
@@ -108,37 +117,65 @@ async function handleTimeoffReview(interaction) {
   schedule();
 }
 
+async function applyConfiguration(channels) {
+  adminChannel = channels.adminChannelId;
+  if (automation) Object.assign(automation, { channel: channels.donationChannelId, reminder: channels.reminderChannelId });
+  else automation = new Automation({ guild: configuredGuild, channel: channels.donationChannelId,
+    reminder: channels.reminderChannelId, store, timezone, botId: client.user.id });
+  configurationError = null;
+  const oldNotice = store.data.vacationPanel ? { ...store.data.vacationPanel } : null;
+  try {
+    await ensureVacationNotice(channels.vacationChannelId, store, client.user.id);
+    if (oldNotice && oldNotice.channelId !== channels.vacationChannelId.id) {
+      try {
+        const oldChannel = await configuredGuild.channels.fetch(oldNotice.channelId);
+        const message = await oldChannel.messages.fetch(oldNotice.messageId);
+        if (message.author.id === client.user.id) await message.edit({
+          ...brandedMessage('Crazyland clan member vacations.',
+            'Vacation requests have moved to <#' + channels.vacationChannelId.id + '>. You can also use /clan action:Request time off.'),
+          components: [], attachments: [],
+        });
+      } catch (error) { console.error('Could not retire previous vacation notice:', error.message); }
+    }
+  } catch (error) {
+    configurationError = 'Settings are active, but the vacation notice could not be updated: ' + error.message + '. Save Setup again to retry.';
+    console.error(configurationError);
+  }
+}
+
+async function handleSetup(interaction) {
+  checkAccess(interaction, GUILD_ID, settings());
+  const [, id, operation] = interaction.customId.split(':');
+  const session = setupSessions.get(id, interaction.user.id, interaction.guildId);
+  if (operation === 'cancel') {
+    setupSessions.close(session);
+    return interaction.editReply({ ...brandedMessage('Crazyland clan setup.', 'Setup cancelled. Your saved settings are unchanged.'), components: [], attachments: [] });
+  }
+  if (operation === 'field') setupSessions.selectField(session, interaction.values?.[0]);
+  else if (operation === 'value') setupSessions.selectValues(session, interaction.values);
+  else if (operation === 'save') {
+    try {
+      const channels = await validateSettings(configuredGuild, session.draft);
+      saveSettings(store, session.draft, session.revision);
+      session.revision = store.data.settingsRevision;
+      session.draft = settings();
+      await applyConfiguration(channels);
+      schedule();
+      return interaction.editReply(setupView(session, configurationError || '**Setup saved.** Your channel and role choices are now active.'));
+    } catch (error) { return interaction.editReply(setupView(session, 'Could not save setup: ' + error.message)); }
+  } else throw new Error('Unknown setup action.');
+  return interaction.editReply(setupView(session));
+}
+
 client.once(Events.ClientReady, async () => {
   try {
-    const guild = await client.guilds.fetch(GUILD_ID);
-    const channel = await guild.channels.fetch(DONATION_CHANNEL_ID);
-    adminChannel = await guild.channels.fetch(ADMIN_CHANNEL_ID);
-    if (channel?.type !== ChannelType.GuildText) throw new Error('Donation channel must be a normal text channel in this server.');
-    if (adminChannel?.type !== ChannelType.GuildText) throw new Error('Admin channel 1537173435611090944 must be a normal text channel in this server.');
-    for (const roleId of TIMEOFF_ROLE_IDS) {
-      if (!await guild.roles.fetch(roleId)) throw new Error(`Configured time-off role ${roleId} was not found in this server.`);
-    }
-    const me = await guild.members.fetchMe();
-    const permissions = channel.permissionsFor(me);
-    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'AddReactions', 'SendMessages', 'AttachFiles', 'EmbedLinks']) {
-      if (!permissions?.has(PermissionFlagsBits[permission])) throw new Error(`Missing donation channel permission: ${permission}`);
-    }
-    const adminPermissions = adminChannel.permissionsFor(me);
-    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'EmbedLinks', 'AttachFiles']) {
-      if (!adminPermissions?.has(PermissionFlagsBits[permission])) throw new Error(`Missing admin channel permission: ${permission}`);
-    }
-    if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
+    configuredGuild = await client.guilds.fetch(GUILD_ID);
     store = new Store(fileURLToPath(new URL('./data/state.json', import.meta.url)), today(), GUILD_ID, timezone);
-    automation = new Automation({ guild, channel, reminder: channel, store, timezone, botId: client.user.id });
-    const vacationChannel = await guild.channels.fetch(VACATION_CHANNEL_ID);
-    if (vacationChannel?.type !== ChannelType.GuildText) throw new Error('Vacation channel must be a normal text channel.');
-    for (const permission of ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'EmbedLinks', 'AttachFiles']) {
-      if (!vacationChannel.permissionsFor(me)?.has(PermissionFlagsBits[permission])) throw new Error(`Missing vacation channel permission: ${permission}`);
-    }
-    await ensureVacationNotice(vacationChannel, store, client.user.id);
-    console.log(`Vacation notice ready in ${VACATION_CHANNEL_ID}.`);
-    await registerCommands(guild);
-    console.log(`Ready: Patient daily checks in ${timezone}. Reminders go to the donation channel.`);
+    // Keep Setup available even if a configured channel or role was deleted.
+    await registerCommands(configuredGuild);
+    try { await applyConfiguration(await validateSettings(configuredGuild, settings())); }
+    catch (error) { configurationError = error.message; console.error('Open /clan action:Setup:', error.message); }
+    console.log('Ready: clan commands in ' + timezone + '. Donation automation ' + (automation ? 'active.' : 'needs setup.'));
     timer = setInterval(schedule, 60000);
     schedule();
   } catch (error) {
@@ -149,7 +186,7 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on(Events.MessageCreate, async message => {
-  if (!automation || message.guildId !== GUILD_ID || message.channelId !== DONATION_CHANNEL_ID
+  if (!automation || message.guildId !== GUILD_ID || message.channelId !== settings().donationChannelId
       || message.author.bot || message.webhookId || !hasImage(message)) return;
   try {
     await patient(message.author.id);
@@ -159,17 +196,29 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+  const isSetup = interaction.isMessageComponent() && interaction.customId.startsWith('setup:');
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
   const isButton = interaction.isButton() && (interaction.customId === VACATION_BUTTON || ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix)));
   const isVacationSubmit = interaction.isModalSubmit() && [VACATION_MODAL, CLAN_TIMEOFF_MODAL].includes(interaction.customId);
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
-  if (!isCommand && !isButton && !isModal && !isVacationSubmit) return;
+  if (!isCommand && !isButton && !isModal && !isVacationSubmit && !isSetup) return;
   try {
-    if (!automation || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
-    checkAccess(interaction, GUILD_ID);
+    if (!store || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
+    checkAccess(interaction, GUILD_ID, settings());
     const action = commandAction(interaction);
+    if (isSetup) {
+      await interaction.deferUpdate();
+      await serialize(() => handleSetup(interaction));
+      return;
+    }
+    if (isCommand && action === 'setup') {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await serialize(() => interaction.editReply(setupView(setupSessions.open(interaction.user.id, interaction.guildId, store.data), configurationError || '')));
+      return;
+    }
+    if (!automation) throw new Error('An administrator needs to finish /clan action:Setup before using donation features.');
     if (interaction.customId === VACATION_BUTTON || interaction.customId === VACATION_MODAL) {
-      if (interaction.channelId !== VACATION_CHANNEL_ID) throw new Error('Use the notice in the member vacations channel.');
+      if (interaction.channelId !== settings().vacationChannelId) throw new Error('Use the notice in the member vacations channel.');
       if (isButton) {
         if (interaction.message.author.id !== client.user.id) throw new Error('This is not the bot vacation notice.');
         await interaction.showModal(vacationModal(today()));
@@ -192,6 +241,7 @@ client.on(Events.InteractionCreate, async interaction => {
     else if (isButton) await interaction.deferUpdate();
     else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await serialize(async () => {
+      checkAccess(interaction, GUILD_ID, settings());
       if (isReview) return handleTimeoffReview(interaction);
       const page = isButton ? Number(interaction.customId.split(':').at(-1)) || 0 : 0;
       if (isModal) return handleAdminSubmit(interaction, interaction.customId.split(':')[1]);
@@ -219,14 +269,15 @@ client.on(Events.InteractionCreate, async interaction => {
         try {
           const notice = await adminChannel.send(timeoffRequestNotice(request));
           request.noticeMessageId = notice.id;
+          request.noticeChannelId = adminChannel.id;
           store.save();
         } catch (error) {
           console.error(`Could not notify admins about request ${request.id}:`, error.message);
           return interaction.editReply(brandedMessage('Crazyland clan vacation request saved.',
-            `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/clan action:Admin panel\`.`));
+            `Request **${request.id}** was saved, but I could not post it in <#${settings().adminChannelId}>. An admin can still review it in \`/clan action:Admin panel\`.`));
         }
         return interaction.editReply(brandedMessage('Crazyland clan vacation request submitted.',
-          'Your request is waiting for a Leader or Co-leader. You are excused only after approval.\nUse `/clan action:My time off` to check for updates.', {
+          'Your request is waiting for a configured clan leader. You are excused only after approval.\nUse `/clan action:My time off` to check for updates.', {
             fields: [
               { name: 'Dates', value: `${formatTimeoffDate(request.start)} through ${formatTimeoffDate(request.end)}` },
               { name: 'Days off', value: String(days), inline: true },

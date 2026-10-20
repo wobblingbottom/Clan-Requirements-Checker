@@ -33,9 +33,9 @@ test('time-off rejection still requires Administrator permission', () => {
 test('only Leader and Co-leader roles can approve through buttons or submitted admin forms', () => {
   for (const customId of ['timeoff-review:approve:abc123', 'admin:approve', 'admin-submit:approve']) {
     const base = { guildId: 'server', customId };
-    assert.throws(() => checkAccess(base, 'server'), /Only Leaders and Co-leaders/);
-    assert.throws(() => checkAccess({ ...base, memberPermissions: new PermissionsBitField(PermissionFlagsBits.Administrator) }, 'server'), /Only Leaders and Co-leaders/);
-    assert.throws(() => checkAccess({ ...base, member: { roles: ['1532826889499185302'] } }, 'server'), /Only Leaders and Co-leaders/);
+    assert.throws(() => checkAccess(base, 'server'), /configured leadership roles/);
+    assert.throws(() => checkAccess({ ...base, memberPermissions: new PermissionsBitField(PermissionFlagsBits.Administrator) }, 'server'), /configured leadership roles/);
+    assert.throws(() => checkAccess({ ...base, member: { roles: ['1532826889499185302'] } }, 'server'), /configured leadership roles/);
     for (const role of ['1532826140086112256', '1532826772624769316']) {
       for (const roles of [[role], { cache: new Map([[role, {}]]) }]) {
         assert.doesNotThrow(() => checkAccess({ ...base, member: { roles } }, 'server'));

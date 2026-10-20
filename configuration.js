@@ -1,0 +1,96 @@
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
+
+export function defaultSettings() {
+  const donation = process.env.DONATION_CHANNEL_ID || '1535655837828382740';
+  return {
+    donationChannelId: donation, reminderChannelId: donation,
+    vacationChannelId: '1549128315095355422', adminChannelId: '1537173435611090944',
+    memberRoleId: '1532826238572298451',
+    leaderRoleIds: ['1532826140086112256', '1532826772624769316'],
+    timeoffRoleIds: ['1532826889499185302'],
+  };
+}
+export function getSettings(data = {}) {
+  return structuredClone({ ...defaultSettings(), ...data.settings });
+}
+export const requestRoleIds = settings => [...new Set([
+  settings.memberRoleId, ...settings.leaderRoleIds, ...settings.timeoffRoleIds,
+])];
+export const SETTINGS_FIELDS = {
+  vacationChannelId: { label: 'Vacation notice channel', kind: 'channel' },
+  donationChannelId: { label: 'Donation proof channel', kind: 'channel' },
+  reminderChannelId: { label: 'Donation reminder channel', kind: 'channel' },
+  adminChannelId: { label: 'Time-off review channel', kind: 'channel' },
+  memberRoleId: { label: 'Tracked member role', kind: 'role' },
+  leaderRoleIds: { label: 'Leader / approval roles', kind: 'roles', min: 1 },
+  timeoffRoleIds: { label: 'Additional time-off roles', kind: 'roles', min: 0 },
+};
+
+export function normalizeSettings(settings) {
+  const result = {};
+  const id = value => typeof value === 'string' && /^\d{17,20}$/.test(value);
+  for (const [key, field] of Object.entries(SETTINGS_FIELDS)) {
+    const value = settings[key];
+    if (field.kind === 'roles') {
+      if (!Array.isArray(value) || value.length < field.min || value.length > 10 || !value.every(id)) {
+        throw new Error(`Choose ${field.min}–10 roles for ${field.label}.`);
+      }
+      result[key] = [...new Set(value)];
+    } else {
+      if (!id(value)) throw new Error(`Choose a valid ${field.label}.`);
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+export async function validateSettings(guild, settings) {
+  settings = normalizeSettings(settings);
+  const me = await guild.members.fetchMe();
+  const channels = {};
+  for (const [key, field] of Object.entries(SETTINGS_FIELDS)) {
+    if (field.kind !== 'channel') continue;
+    const channel = await guild.channels.fetch(settings[key]);
+    if (!channel || channel.guildId !== guild.id || channel.type !== ChannelType.GuildText) {
+      throw new Error(`${field.label} must be a text channel in this server.`);
+    }
+    const permissions = channel.permissionsFor(me);
+    const required = ['ViewChannel', 'ReadMessageHistory', 'SendMessages', 'AttachFiles', 'EmbedLinks'];
+    if (key === 'donationChannelId') required.push('AddReactions');
+    for (const permission of required) {
+      if (!permissions?.has(PermissionFlagsBits[permission])) throw new Error(`${field.label}: bot needs ${permission}.`);
+    }
+    channels[key] = channel;
+  }
+  for (const roleId of requestRoleIds(settings)) {
+    const role = await guild.roles.fetch(roleId);
+    if (!role || role.guild.id !== guild.id || role.id === guild.id || role.managed) {
+      throw new Error('Choose member and leadership roles from this server; everyone and bot-managed roles are not supported.');
+    }
+  }
+  if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
+  return channels;
+}
+
+export function saveSettings(store, settings, expectedRevision) {
+  if ((store.data.settingsRevision || 0) !== expectedRevision) {
+    throw new Error('Another admin changed setup. Open Setup again to use the latest settings.');
+  }
+  const normalized = normalizeSettings(settings);
+  const previous = { settings: store.data.settings, revision: store.data.settingsRevision, requests: store.data.requests };
+  const oldChannel = getSettings(store.data).adminChannelId;
+  // Keep pending approvals usable after the review channel moves.
+  const requests = Object.fromEntries(Object.entries(store.data.requests).map(([id, request]) => [id,
+    request.noticeMessageId && !request.noticeChannelId ? { ...request, noticeChannelId: oldChannel } : request]));
+  Object.assign(store.data, { settings: normalized, settingsRevision: expectedRevision + 1, requests });
+  try { store.save(); }
+  catch (error) {
+    if (previous.settings === undefined) delete store.data.settings;
+    else store.data.settings = previous.settings;
+    if (previous.revision === undefined) delete store.data.settingsRevision;
+    else store.data.settingsRevision = previous.revision;
+    store.data.requests = previous.requests;
+    throw error;
+  }
+  return getSettings(store.data);
+}

@@ -1,7 +1,8 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { commandAction } from './command-menu.js';
+import { defaultSettings } from './configuration.js';
 
-export function checkAccess(interaction, guildId) {
+export function checkAccess(interaction, guildId, settings = defaultSettings()) {
   if (interaction.guildId !== guildId) throw new Error('This is not the configured server.');
   const action = commandAction(interaction);
   const approval = interaction.customId?.startsWith('timeoff-review:approve:')
@@ -10,17 +11,18 @@ export function checkAccess(interaction, guildId) {
   if (approval) {
     const roles = interaction.member?.roles;
     const hasRole = id => Array.isArray(roles) ? roles.includes(id) : roles?.cache?.has(id);
-    if (!['1532826140086112256', '1532826772624769316'].some(hasRole)) {
-      throw new Error('Only Leaders and Co-leaders can approve time-off requests.');
+    if (!settings.leaderRoleIds.some(hasRole)) {
+      throw new Error('Only members of the configured leadership roles can approve time-off requests.');
     }
     return;
   }
-  const admin = interaction.customId?.startsWith('admin:')
+  const admin = action === 'setup' || interaction.customId?.startsWith('setup:')
+    || interaction.customId?.startsWith('admin:')
     || interaction.customId?.startsWith('admin-submit:')
     || interaction.customId?.startsWith('timeoff-review:')
     || action === 'donation-admin';
   if (admin && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-    throw new Error('Only server administrators can manage days off.');
+    throw new Error('Only server administrators can manage setup and days off.');
   }
   if ((action === 'donations' || interaction.customId?.startsWith('report-page:'))
       && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {

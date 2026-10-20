@@ -11,6 +11,20 @@ Checks only human members with the **Patient** role, ID `1532826238572298451`, f
 
 The bot checks that an image was uploaded. Officers still need to verify that the image proves the donation and meets the required amount.
 
+## Server setup
+
+Use **/clan → action: Setup** as a server administrator. Choose a setting, pick its channel or roles in the native Discord selector, then press **Save setup**. **Cancel** discards unsaved edits. The panel is private, expires after 30 minutes, and rejects stale saves if another admin has changed setup.
+
+- **Vacation notice channel:** where the Vacation button message is posted or updated. Moving it replaces the old notice with a link to the new location when the bot can still edit it.
+- **Donation proof channel:** where image submissions count as proof.
+- **Donation reminder channel:** where missing-member reminders are sent; it can differ from the proof channel.
+- **Time-off review channel:** where new requests and approval buttons are posted. Existing request messages remain reviewable in their original channel.
+- **Tracked member role:** the one role whose human members must submit donation proof.
+- **Leader / approval roles:** one or more roles allowed to approve time off. Server Administrator alone does not grant approval authority unless the admin also has a chosen leadership role.
+- **Additional time-off roles:** optional extra roles that may request vacations. Tracked members and leaders can already request time off.
+
+Saved choices take effect immediately and survive restarts in the persistent state file. They override the original channel and role defaults described below. Existing requests, grants and reminder progress are preserved. Channel permissions and selected roles are checked before saving. If a configured channel or role is deleted, Setup remains available to repair it.
+
 ## Commands and the Discord admin panel
 
 On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its red **Vacation** button opens a private form with the same values as `/clan action:Request time off`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
@@ -22,6 +36,7 @@ On startup the bot posts the branded member vacations notice in channel `1549128
 | `/clan action:Request time off` | Members with an allowed time-off role | Open a private form for the start date, number of days and optional reason |
 | `/clan action:My time off` | Members | View their own requests and approved dates |
 | `/clan action:Admin panel` | Administrator | Open the private admin panel |
+| `/clan action:Setup` | Administrator | Choose channels and member / leadership roles |
 
 The `/clan action:Admin panel` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
 
