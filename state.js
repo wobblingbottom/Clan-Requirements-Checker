@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validDay } from './tracking.js';
 import { breakForDay } from './break-state.js';
-import { getSettings, defaultSettings, requestRoleIds } from './configuration.js';
+import { getSettings, defaultSettings, requestRoleIds, isFormerMember } from './configuration.js';
 
 export const PATIENT_ROLE_ID = '1532826238572298451';
 export const TIMEOFF_ROLE_IDS = [
@@ -17,7 +17,7 @@ export const VACATION_TAG = '[Vacation]';
 export const shiftDay = (day, offset) => new Date(Date.parse(`${day}T12:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
 export const isExcused = (state, userId, day) => Object.values(state.grants)
   .some(g => g.userId === userId && !g.revokedAt && g.start <= day && day <= g.end);
-export const canRequestTimeoff = (member, settings = defaultSettings()) => !member.user.bot
+export const canRequestTimeoff = (member, settings = defaultSettings()) => !member.user.bot && !isFormerMember(member, settings)
   && requestRoleIds(settings).some(roleId => member.roles.cache.has(roleId));
 
 export function dateRange(start, days) {
@@ -41,8 +41,8 @@ export function taggedName(base, tag = TAG) {
 }
 
 export function classify(members, submissions, state, day) {
-  const memberRoleId = getSettings(state).memberRoleId;
-  const roster = [...members.values()].filter(m => !m.user.bot && m.roles.cache.has(memberRoleId));
+  const settings = getSettings(state);
+  const roster = [...members.values()].filter(m => !m.user.bot && m.roles.cache.has(settings.memberRoleId) && !isFormerMember(m, settings));
   const pause = breakForDay(state, day);
   const excused = roster.filter(m => pause || isExcused(state, m.id, day));
   const required = roster.filter(m => !pause && !isExcused(state, m.id, day));

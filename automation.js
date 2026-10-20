@@ -3,11 +3,15 @@ import { classify, shiftDay, taggedName, TAG, VACATION_TAG, isExcused } from './
 import { createHash } from 'node:crypto';
 import { reminderMessage, matchesReminder } from './messages.js';
 import { fetchMembers } from './members.js';
+import { getSettings, isFormerMember } from './configuration.js';
 import { breakForDay, activeBreak } from './break-state.js';
 
-export async function syncNickname(member, missing, store, vacation = false) {
+export async function syncNickname(member, missing, store, vacation = false, clearOrphanTag = false) {
   let record = store.data.nicknames[member.id];
   const tag = vacation ? VACATION_TAG : missing ? TAG : null;
+  if (!tag && !record && clearOrphanTag && (member.nickname?.includes(TAG) || member.nickname?.includes(VACATION_TAG))) {
+    record = { original: member.nickname.replace(/\s*\[(?:No Donation Proof|Vacation)\]/g, '').trim() || null, applied: member.nickname };
+  }
   if (!tag && !record) return;
   if (!member.manageable) throw new Error(`Cannot edit nickname for ${member.id}: check Manage Nicknames and role hierarchy.`);
   if (tag) {
@@ -71,8 +75,9 @@ export class Automation {
     const missing = new Set(report.missing.map(m => m.id));
     const vacation = new Set(report.excused.filter(m => !report.pause || isExcused(this.store.data, m.id, today)).map(m => m.id));
     this.nicknameErrors = [];
+    const settings = getSettings(this.store.data);
     for (const member of report.members.values()) {
-      try { await syncNickname(member, missing.has(member.id), this.store, vacation.has(member.id)); }
+      try { await syncNickname(member, missing.has(member.id), this.store, vacation.has(member.id), isFormerMember(member, settings)); }
       catch (error) { this.nicknameErrors.push(error.message); }
     }
     // Members who left cannot have their old server nickname restored.

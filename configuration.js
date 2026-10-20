@@ -6,7 +6,7 @@ export function defaultSettings() {
   return {
     donationChannelId: donation, reminderChannelId: donation,
     vacationChannelId: '1549128315095355422', adminChannelId: '1537173435611090944',
-    memberRoleId: '1532826238572298451',
+    memberRoleId: '1532826238572298451', formerMemberRoleId: null,
     leaderRoleIds: ['1532826140086112256', '1532826772624769316'],
     timeoffRoleIds: ['1532826889499185302'],
   };
@@ -14,6 +14,7 @@ export function defaultSettings() {
 export function getSettings(data = {}) {
   return structuredClone({ ...defaultSettings(), ...data.settings });
 }
+export const isFormerMember = (member, settings) => Boolean(settings.formerMemberRoleId && member.roles.cache.has(settings.formerMemberRoleId));
 export const requestRoleIds = settings => [...new Set([
   settings.memberRoleId, ...settings.leaderRoleIds, ...settings.timeoffRoleIds,
 ])];
@@ -23,6 +24,7 @@ export const SETTINGS_FIELDS = {
   reminderChannelId: { label: 'Donation reminder channel', kind: 'channel' },
   adminChannelId: { label: 'Time-off review channel', kind: 'channel' },
   memberRoleId: { label: 'Tracked member role', kind: 'role' },
+  formerMemberRoleId: { label: 'No longer a member role', kind: 'role', min: 0 },
   leaderRoleIds: { label: 'Leader / approval roles', kind: 'roles', min: 1 },
   timeoffRoleIds: { label: 'Additional time-off roles', kind: 'roles', min: 0 },
 };
@@ -37,11 +39,14 @@ export function normalizeSettings(settings) {
         throw new Error(`Choose ${field.min}–10 roles for ${field.label}.`);
       }
       result[key] = [...new Set(value)];
+    } else if (field.min === 0 && value == null) {
+      result[key] = null;
     } else {
       if (!id(value)) throw new Error(`Choose a valid ${field.label}.`);
       result[key] = value;
     }
   }
+  if (result.formerMemberRoleId === result.memberRoleId) throw new Error('Choose different tracked member and no-longer-a-member roles.');
   return result;
 }
 
@@ -63,7 +68,7 @@ export async function validateSettings(guild, settings) {
     }
     channels[key] = channel;
   }
-  for (const roleId of requestRoleIds(settings)) {
+  for (const roleId of new Set([...requestRoleIds(settings), ...[settings.formerMemberRoleId].filter(Boolean)])) {
     const role = await guild.roles.fetch(roleId);
     if (!role || role.guild.id !== guild.id || role.id === guild.id || role.managed) {
       throw new Error('Choose member and leadership roles from this server; everyone and bot-managed roles are not supported.');

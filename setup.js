@@ -30,21 +30,21 @@ export class SetupSessions {
     const field = SETTINGS_FIELDS[session.field];
     if (!Array.isArray(values) || values.length < (field.min ?? 1) || values.length > (field.kind === 'roles' ? 10 : 1)
       || !values.every(id => /^\d{17,20}$/.test(id))) throw new Error('Choose valid channels or roles from the menu.');
-    session.draft[session.field] = field.kind === 'roles' ? [...new Set(values)] : values[0];
+    session.draft[session.field] = field.kind === 'roles' ? [...new Set(values)] : values[0] ?? null;
   }
   close(session) { this.sessions.delete(session.id); }
 }
 
 export function setupView(session, status = '') {
   const fields = Object.entries(SETTINGS_FIELDS).map(([key, field]) => {
-    const values = Array.isArray(session.draft[key]) ? session.draft[key] : [session.draft[key]];
+    const values = Array.isArray(session.draft[key]) ? session.draft[key] : [session.draft[key]].filter(Boolean);
     return { name: field.label, value: values.map(id => field.kind === 'channel' ? `<#${id}>` : `<@&${id}>`).join(', ') || 'None', inline: true };
   });
   const prefix = `setup:${session.id}`;
   const field = SETTINGS_FIELDS[session.field];
   const settingMenu = new StringSelectMenuBuilder().setCustomId(`${prefix}:field`).setPlaceholder('Choose a setting to edit')
     .addOptions(Object.entries(SETTINGS_FIELDS).map(([key, value]) => ({ label: value.label, value: key, default: key === session.field })));
-  const values = Array.isArray(session.draft[session.field]) ? session.draft[session.field] : [session.draft[session.field]];
+  const values = Array.isArray(session.draft[session.field]) ? session.draft[session.field] : [session.draft[session.field]].filter(Boolean);
   const valueMenu = field.kind === 'channel'
     ? new ChannelSelectMenuBuilder().setChannelTypes(ChannelType.GuildText).setDefaultChannels(...values)
     : new RoleSelectMenuBuilder().setDefaultRoles(...values);
@@ -54,6 +54,7 @@ export function setupView(session, status = '') {
     ...brandedMessage('Crazyland clan setup.',
       'Choose a setting, then select its channel or roles below. Changes take effect when you press **Save setup**.\n\n'
       + 'The member role controls donation tracking. Members, leaders and additional time-off roles can request vacations. Leadership roles can approve them.\n'
+      + 'The no-longer-a-member role overrides membership, stops donation tracking and removes bot nickname tags.\n'
       + 'Saving posts or updates the Vacation notice in your chosen channel.\n' + status.slice(0, 1200), { fields }),
     attachments: [],
     components: [new ActionRowBuilder().addComponents(settingMenu), new ActionRowBuilder().addComponents(valueMenu),

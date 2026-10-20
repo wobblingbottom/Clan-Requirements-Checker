@@ -11,7 +11,7 @@ import { brandedMessage } from './messages.js';
 import { formatTimeoffDate, parseTimeoffDate } from './timeoff-date.js';
 import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
 
-import { getSettings, validateSettings, saveSettings } from './configuration.js';
+import { getSettings, validateSettings, saveSettings, isFormerMember } from './configuration.js';
 import { SetupSessions, setupView } from './setup.js';
 import { DonationBreakManager } from './donation-breaks.js';
 import { breakModal, breaksView, BREAK_MODAL } from './break-panel.js';
@@ -59,7 +59,7 @@ const schedule = () => {
 };
 async function patient(userId) {
   const member = await automation.guild.members.fetch(userId);
-  if (member.user.bot || !member.roles.cache.has(settings().memberRoleId)) throw new Error('This member must have the configured member role.');
+  if (member.user.bot || isFormerMember(member, settings()) || !member.roles.cache.has(settings().memberRoleId)) throw new Error('This member must have the configured member role.');
   return member;
 }
 async function timeoffMember(userId) {
@@ -192,6 +192,10 @@ client.once(Events.ClientReady, async () => {
     client.destroy();
     process.exitCode = 1;
   }
+});
+
+client.on(Events.GuildMemberUpdate, (previous, member) => {
+  if (member.guild.id === GUILD_ID && isFormerMember(previous, settings()) !== isFormerMember(member, settings())) schedule();
 });
 
 client.on(Events.MessageCreate, async message => {

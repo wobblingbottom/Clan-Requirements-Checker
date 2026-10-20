@@ -30,6 +30,7 @@ Use **/clan → action: Setup** as a server administrator. Choose a setting, pic
 - **Donation reminder channel:** where missing-member reminders are sent; it can differ from the proof channel.
 - **Time-off review channel:** where new requests and approval buttons are posted. Existing request messages remain reviewable in their original channel.
 - **Tracked member role:** the one role whose human members must submit donation proof.
+- **No longer a member role:** optional role that overrides the tracked member role. Members with it are excluded from donation checks and vacation requests. The bot removes its `[No Donation Proof]` and `[Vacation]` nickname markers, including orphan markers, while preserving other nickname text. Clear the selector to disable this exclusion. Role changes trigger a check immediately; the regular one-minute check also applies.
 - **Leader / approval roles:** one or more roles allowed to approve time off. Server Administrator alone does not grant approval authority unless the admin also has a chosen leadership role.
 - **Additional time-off roles:** optional extra roles that may request vacations. Tracked members and leaders can already request time off.
 
