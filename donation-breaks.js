@@ -1,6 +1,9 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { PermissionFlagsBits, ChannelType, escapeMarkdown } from 'discord.js';
 import { validDay, dayAt } from './tracking.js';
+import { formatTimeoffDate } from './timeoff-date.js';
+
+const ANNOUNCEMENT_VERSION = 2;
 import { donationBreaks } from './break-state.js';
 import { getSettings } from './configuration.js';
 import { brandedMessage, BRAND_FOOTER } from './messages.js';
@@ -100,19 +103,25 @@ export class DonationBreakManager {
     this.store.save();
   }
   announcement(record, phase) {
-    const text = phase === 'scheduled'
-      ? `Donations will be paused from **${record.start} through ${record.end}**, inclusive (${this.timezone}).`
-      : phase === 'active' ? `Donations are paused through **${record.end}**, inclusive (${this.timezone}).`
-        : phase === 'cancelled' ? 'This scheduled donation break was cancelled. Donation requirements continue as usual.'
-          : 'This donation break has ended. Posting permissions have been restored. Regular donation requirements resume on the next non-break day.';
-    const payload = brandedMessage('Crazyland clan donation break.', `**${escapeMarkdown(record.name)}**\n\n${text}`
-      + (['scheduled', 'active'].includes(phase) ? '\n\nNo donation proof or missing-proof reminders are required for these dates. During the break, this channel is read-only for regular members. Administrators can still post.' : '')
-      + (record.reason ? `\n\n${escapeMarkdown(record.reason)}` : ''));
-    payload.embeds[0].setFooter({ ...payload.embeds[0].data.footer, text: `${BRAND_FOOTER} • Donation break ${record.id}` });
+    const dates = '**' + formatTimeoffDate(record.start) + ' through ' + formatTimeoffDate(record.end) + '**';
+    const text = phase === 'scheduled' ? 'Donations will be paused from ' + dates + '.'
+      : phase === 'active' ? 'Donations are paused from ' + dates + '.'
+        : phase === 'cancelled' ? 'This donation break has been cancelled.'
+          : 'This donation break has ended. Daily donations resume on the next non-break day.';
+    const payload = brandedMessage('Crazyland clan donation break.', '**' + escapeMarkdown(record.name) + '**\n\n' + text
+      + (record.reason ? '\n\n' + escapeMarkdown(record.reason) : ''));
+    const footerFile = payload.files.find(file => file.name === 'crazyland-footer.png');
+    // Keep recovery metadata in the image filename, not the visible footer.
+    // EmbedBuilder input expects iconURL; raw embed data uses icon_url.
+    if (footerFile) {
+      const name = 'crazyland-footer-' + record.id + '.png';
+      footerFile.setName(name);
+      payload.embeds[0].setFooter({ text: BRAND_FOOTER, iconURL: 'attachment://' + name });
+    } else payload.embeds[0].setURL('https://discord.com/channels/' + this.guild.id + '/' + record.channelId + '?donation-break=' + record.id);
     return payload;
   }
   async announce(record, channel, phase) {
-    if (record.announcementPhase === phase && record.announcementMessageId) return;
+    if (record.announcementPhase === phase && record.announcementMessageId && record.announcementVersion === ANNOUNCEMENT_VERSION) return;
     let message;
     if (record.announcementMessageId) {
       try { message = await channel.messages.fetch(record.announcementMessageId); }
@@ -124,7 +133,9 @@ export class DonationBreakManager {
         if (page >= 100) throw new Error('Cannot safely recover the break announcement; history scan limit reached.');
         const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}), cache: false });
         message = [...batch.values()].find(item => item.author.id === this.botId
-          && item.embeds?.some(embed => embed.footer?.text === `${BRAND_FOOTER} • Donation break ${record.id}`));
+          && item.embeds?.some(embed => embed.footer?.text === `${BRAND_FOOTER} • Donation break ${record.id}`
+            || embed.footer?.icon_url?.includes(`crazyland-footer-${record.id}.png`)
+            || embed.url === `https://discord.com/channels/${this.guild.id}/${record.channelId}?donation-break=${record.id}`));
         if (message || batch.size < 100 || Math.min(...[...batch.values()].map(m => m.createdTimestamp)) < record.createdAt - 60000) break;
         before = [...batch.keys()].reduce((a, b) => BigInt(a) < BigInt(b) ? a : b);
       }
@@ -134,6 +145,7 @@ export class DonationBreakManager {
     else message = await channel.send({ ...payload, nonce: createHash('sha256').update(`break:${this.guild.id}:${record.id}`).digest('hex').slice(0, 24), enforceNonce: true });
     record.announcementMessageId = message.id;
     record.announcementPhase = phase;
+    record.announcementVersion = ANNOUNCEMENT_VERSION;
     this.store.save();
   }
   async sync() {

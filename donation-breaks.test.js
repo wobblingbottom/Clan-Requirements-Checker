@@ -171,3 +171,28 @@ test('failed permission restoration remains pending and is retried on the next c
   await assert.rejects(f.manager.sync(),/Temporary permissions failure/);assert.ok(!record.finished);assert.ok(!record.lock.restored);
   f.channel.edit=edit;await f.manager.sync();assert.equal(record.finished,true);assert.deepEqual(snapshot(f.channel),original);
 });
+
+
+test('announcement keeps only member-facing text and references the logo inside its footer', async () => {
+  const f = fixture(); const record = await create(f);
+  const payload = f.manager.announcement(record, 'active');
+  const embed = payload.embeds[0].toJSON();
+  assert.match(embed.description, /21 Oct through 1 Nov/);
+  assert.doesNotMatch(embed.description, /Administrators|read-only|missing-proof|Europe|inclusive/);
+  assert.equal(embed.footer.text, 'Crazyland Asylum');
+  assert.equal(embed.footer.icon_url, 'attachment://crazyland-footer-' + record.id + '.png');
+  for (const file of payload.files) {
+    assert.ok([embed.author.icon_url, embed.footer.icon_url, embed.thumbnail?.url].includes('attachment://' + file.name));
+  }
+});
+
+test('existing announcements refresh to the new layout without posting a second message', async () => {
+  const f = fixture(); const record = await create(f); await f.manager.sync();
+  const message = f.history.get(record.announcementMessageId);
+  message.embeds[0].footer = { text: 'Crazyland Asylum • Donation break ' + record.id };
+  delete record.announcementVersion;
+  await f.manager.sync();
+  assert.equal(f.sent.length, 1);
+  assert.equal(message.embeds[0].footer.text, 'Crazyland Asylum');
+  assert.ok(message.embeds[0].footer.icon_url);
+});
