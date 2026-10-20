@@ -6,6 +6,7 @@ import { Automation } from './automation.js';
 import { commands, panel, adminTimeoffView, modal } from './panel.js';
 import { timeoffView, donationView, timeoffRequestNotice } from './views.js';
 import { checkAccess } from './access.js';
+import { commandAction, registerCommands, CLAN_TIMEOFF_MODAL } from './command-menu.js';
 import { brandedMessage } from './messages.js';
 import { formatTimeoffDate, parseTimeoffDate } from './timeoff-date.js';
 import { VACATION_CHANNEL_ID, VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } from './vacation-panel.js';
@@ -81,7 +82,7 @@ async function handleAdminSubmit(interaction, action) {
     const request = store.data.requests[get('id')];
     store.reject(get('id'), interaction.user.id);
     await updateRequestNotice(request, 'rejected', interaction.user.id);
-    response = 'Request rejected. The member can see this with /timeoff-status.';
+    response = 'Request rejected. The member can see this with /clan action:My time off.';
   } else if (action === 'revoke') {
     store.revoke(get('id'), interaction.user.id);
     response = 'Days off revoked. Daily checks apply again unless another approved period covers the member.';
@@ -136,7 +137,7 @@ client.once(Events.ClientReady, async () => {
     }
     await ensureVacationNotice(vacationChannel, store, client.user.id);
     console.log(`Vacation notice ready in ${VACATION_CHANNEL_ID}.`);
-    for (const command of commands) await guild.commands.create(command.toJSON());
+    await registerCommands(guild);
     console.log(`Ready: Patient daily checks in ${timezone}. Reminders go to the donation channel.`);
     timer = setInterval(schedule, 60000);
     schedule();
@@ -160,19 +161,24 @@ client.on(Events.MessageCreate, async message => {
 client.on(Events.InteractionCreate, async interaction => {
   const isCommand = interaction.isChatInputCommand() && commands.some(c => c.name === interaction.commandName);
   const isButton = interaction.isButton() && (interaction.customId === VACATION_BUTTON || ['admin:', 'timeoff-page:', 'report-page:', 'timeoff-review:'].some(prefix => interaction.customId.startsWith(prefix)));
-  const isVacationSubmit = interaction.isModalSubmit() && interaction.customId === VACATION_MODAL;
+  const isVacationSubmit = interaction.isModalSubmit() && [VACATION_MODAL, CLAN_TIMEOFF_MODAL].includes(interaction.customId);
   const isModal = interaction.isModalSubmit() && interaction.customId.startsWith('admin-submit:');
   if (!isCommand && !isButton && !isModal && !isVacationSubmit) return;
   try {
     if (!automation || interaction.guildId !== GUILD_ID) throw new Error('Bot is starting or this is not the configured server.');
     checkAccess(interaction, GUILD_ID);
-    if (interaction.customId === VACATION_BUTTON || isVacationSubmit) {
+    const action = commandAction(interaction);
+    if (interaction.customId === VACATION_BUTTON || interaction.customId === VACATION_MODAL) {
       if (interaction.channelId !== VACATION_CHANNEL_ID) throw new Error('Use the notice in the member vacations channel.');
       if (isButton) {
         if (interaction.message.author.id !== client.user.id) throw new Error('This is not the bot vacation notice.');
         await interaction.showModal(vacationModal(today()));
         return;
       }
+    }
+    if (isCommand && action === 'timeoff') {
+      await interaction.showModal(vacationModal(today(), CLAN_TIMEOFF_MODAL));
+      return;
     }
     if (isButton && interaction.customId.startsWith('admin:')
         && interaction.customId !== 'admin:list' && !interaction.customId.startsWith('admin:page:')) {
@@ -189,17 +195,17 @@ client.on(Events.InteractionCreate, async interaction => {
       if (isReview) return handleTimeoffReview(interaction);
       const page = isButton ? Number(interaction.customId.split(':').at(-1)) || 0 : 0;
       if (isModal) return handleAdminSubmit(interaction, interaction.customId.split(':')[1]);
-      if (interaction.commandName === 'donation-admin') {
+      if (action === 'donation-admin') {
         return interaction.editReply(panel(store, automation, today(), timezone));
       }
       if (isButton && (interaction.customId === 'admin:list' || interaction.customId.startsWith('admin:page:'))) {
         return interaction.editReply(adminTimeoffView(store, today(), timezone, page));
       }
-      if (interaction.commandName === 'timeoff' || isVacationSubmit) {
+      if (isVacationSubmit) {
         await timeoffMember(interaction.user.id);
-        const start = parseTimeoffDate(isVacationSubmit ? interaction.fields.getTextInputValue('start').trim() : interaction.options.getString('start'), today());
-        const days = isVacationSubmit ? Number(interaction.fields.getTextInputValue('days').trim()) : interaction.options.getInteger('days');
-        const reason = isVacationSubmit ? interaction.fields.getTextInputValue('reason').trim() : interaction.options.getString('reason') || '';
+        const start = parseTimeoffDate(interaction.fields.getTextInputValue('start').trim(), today());
+        const days = Number(interaction.fields.getTextInputValue('days').trim());
+        const reason = interaction.fields.getTextInputValue('reason').trim();
         dateRange(start, days);
         if (start < today()) throw new Error('Requests must start today or later. Ask an admin for a retroactive exemption.');
         const request = store.request(interaction.user.id, start, days, reason);
@@ -217,10 +223,10 @@ client.on(Events.InteractionCreate, async interaction => {
         } catch (error) {
           console.error(`Could not notify admins about request ${request.id}:`, error.message);
           return interaction.editReply(brandedMessage('Crazyland clan vacation request saved.',
-            `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/donation-admin\`.`));
+            `Request **${request.id}** was saved, but I could not post it in <#${ADMIN_CHANNEL_ID}>. An admin can still review it in \`/clan action:Admin panel\`.`));
         }
         return interaction.editReply(brandedMessage('Crazyland clan vacation request submitted.',
-          'Your request is waiting for a Leader or Co-leader. You are excused only after approval.\nUse `/timeoff-status` to check for updates.', {
+          'Your request is waiting for a Leader or Co-leader. You are excused only after approval.\nUse `/clan action:My time off` to check for updates.', {
             fields: [
               { name: 'Dates', value: `${formatTimeoffDate(request.start)} through ${formatTimeoffDate(request.end)}` },
               { name: 'Days off', value: String(days), inline: true },
@@ -228,7 +234,7 @@ client.on(Events.InteractionCreate, async interaction => {
             ],
           }));
       }
-      if (interaction.commandName === 'timeoff-status' || (isButton && interaction.customId.startsWith('timeoff-page:'))) {
+      if (action === 'timeoff-status' || (isButton && interaction.customId.startsWith('timeoff-page:'))) {
         return interaction.editReply(timeoffView(store, today(), timezone, interaction.user.id, page));
       }
       const enteredDay = isButton ? interaction.customId.split(':')[1] : interaction.options.getString('date');

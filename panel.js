@@ -1,20 +1,9 @@
-import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder,
+import { ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { listMessage, timeoffBlocks, issueBlocks } from './views.js';
 import { formatTimeoffDate } from './timeoff-date.js';
 
-export const commands = [
-  new SlashCommandBuilder().setName('donations').setDescription('Daily Patient proof report, including excused members')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addStringOption(o => o.setName('date').setDescription('Day and month in either order; defaults to today')),
-  new SlashCommandBuilder().setName('timeoff').setDescription('Request days off from donation requirements')
-    .addStringOption(o => o.setName('start').setDescription('First day off: enter the day and month in either order').setRequired(true))
-    .addIntegerOption(o => o.setName('days').setDescription('Number of days, including the start date').setMinValue(1).setMaxValue(365).setRequired(true))
-    .addStringOption(o => o.setName('reason').setDescription('Reason, visible only to you and admins').setMaxLength(500)),
-  new SlashCommandBuilder().setName('timeoff-status').setDescription('View your time-off requests and approved dates'),
-  new SlashCommandBuilder().setName('donation-admin').setDescription('Open the private donation and time-off admin panel')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-];
+export { commands } from './command-menu.js';
 function adminButtons() {
   const buttons = [ ['list', 'Requests & days off'], ['grant', 'Grant days off'],
     ['approve', 'Approve request'], ['reject', 'Reject request'], ['revoke', 'Revoke days off'] ];

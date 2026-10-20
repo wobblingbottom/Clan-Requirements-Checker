@@ -11,15 +11,15 @@ export function vacationNotice() {
     ...brandedMessage('Crazyland clan member vacations.',
       "If you'll be inactive for a few days, let the leadership team know by __creating a ticket__ using the button below. Include how long you expect to be away and, if possible, the reason for your absence.\n\n"
       + '**Member commands**\n'
-      + '`/timeoff` — Request days off with a day and month, number of days (1–365), and optional reason. You can also use the **Vacation** button.\n'
-      + '`/timeoff-status` — View your requests, approval status, and approved dates.\n\n'
+      + '`/clan action:Request time off` — Request days off with a day and month, number of days (1–365), and optional reason. You can also use the **Vacation** button.\n'
+      + '`/clan action:My time off` — View your requests, approval status, and approved dates.\n\n'
       + 'Time off must be approved by a Leader or Co-leader before you are excused from donation requirements.'),
     components: [new ActionRowBuilder().addComponents(new ButtonBuilder()
       .setCustomId(VACATION_BUTTON).setLabel('Vacation').setStyle(ButtonStyle.Danger))],
   };
 }
 
-export function vacationModal(today) {
+export function vacationModal(today, customId = VACATION_MODAL) {
   const fields = [
     new TextInputBuilder().setCustomId('start').setLabel(`Start date (today: ${formatTimeoffDate(today)})`).setStyle(TextInputStyle.Short)
       .setRequired(true).setMinLength(5).setMaxLength(12).setValue(formatTimeoffDate(today)),
@@ -28,7 +28,7 @@ export function vacationModal(today) {
     new TextInputBuilder().setCustomId('reason').setLabel('Reason (optional)').setStyle(TextInputStyle.Paragraph)
       .setRequired(false).setMaxLength(500),
   ];
-  return new ModalBuilder().setCustomId(VACATION_MODAL).setTitle('Request days off')
+  return new ModalBuilder().setCustomId(customId).setTitle('Request days off')
     .addComponents(...fields.map(field => new ActionRowBuilder().addComponents(field)));
 }
 

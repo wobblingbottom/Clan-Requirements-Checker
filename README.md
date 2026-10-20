@@ -13,25 +13,25 @@ The bot checks that an image was uploaded. Officers still need to verify that th
 
 ## Commands and the Discord admin panel
 
-On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its red **Vacation** button opens a private form with the same values as `/timeoff`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
+On startup the bot posts the branded member vacations notice in channel `1549128315095355422`. Its red **Vacation** button opens a private form with the same values as `/clan action:Request time off`: start date, 1–365 days, and an optional reason (up to 500 characters). Submission uses the same role checks and admin approval process. This creates a time-off request, not a separate ticket channel. The notice is reused on restart, and its button keeps working. Give the bot View Channel, Read Message History, Send Messages, Embed Links and Attach Files in that channel.
 
 | Command | Who can use it | Purpose |
 | --- | --- | --- |
-| `/donations` | Manage Server | Today's submitted, missing and excused members, with proof links |
-| `/donations date:2026-09-14` | Manage Server | Report for a previous date |
-| `/timeoff start:15 Sep days:3 reason:Holiday` | Members with an allowed time-off role | Request September 15–17 inclusive and notify the admin channel |
-| `/timeoff-status` | Members | View their own requests and approved dates |
-| `/donation-admin` | Administrator | Open the private admin panel |
+| `/clan action:Donation report` | Manage Server | Today's submitted, missing and excused members, with proof links |
+| `/clan action:Donation report date:2026-09-14` | Manage Server | Report for a previous date |
+| `/clan action:Request time off` | Members with an allowed time-off role | Open a private form for the start date, number of days and optional reason |
+| `/clan action:My time off` | Members | View their own requests and approved dates |
+| `/clan action:Admin panel` | Administrator | Open the private admin panel |
 
-The `/donation-admin` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
+The `/clan action:Admin panel` command opens a panel with buttons for **Requests & days off**, **Grant days off**, **Approve request**, **Reject request**, and **Revoke days off**. Requests, grants and automation issues appear directly in the embed, together with the pending-request count. The panel does not show tracked-member, timezone or last-check fields. Longer lists have **Previous** and **Next** buttons; no text-file cards are sent. Opening or refreshing the panel removes attachments left by an older version.
 
-Members with role `1532826238572298451`, `1532826140086112256`, `1532826772624769316`, or `1532826889499185302` can submit `/timeoff`. The bot posts a styled request in admin channel `1537173435611090944` with **Approve** and **Reject** buttons. Only members with the Leader role (1532826140086112256) or Co-leader role (1532826772624769316) can approve requests, including approvals submitted through the admin panel. Administrator permission alone does not allow approval. Rejection and other admin-panel actions still require Administrator permission. After a decision, the request message shows who approved or rejected it and the buttons disappear. Manual decisions made through `/donation-admin` also update the matching request message when it is still available. Daily donation checks still track only the Patient role `1532826238572298451`.
+Members with role `1532826238572298451`, `1532826140086112256`, `1532826772624769316`, or `1532826889499185302` can submit `/clan action:Request time off`. The bot posts a styled request in admin channel `1537173435611090944` with **Approve** and **Reject** buttons. Only members with the Leader role (1532826140086112256) or Co-leader role (1532826772624769316) can approve requests, including approvals submitted through the admin panel. Administrator permission alone does not allow approval. Rejection and other admin-panel actions still require Administrator permission. After a decision, the request message shows who approved or rejected it and the buttons disappear. Manual decisions made through `/clan action:Admin panel` also update the matching request message when it is still available. Daily donation checks still track only the Patient role `1532826238572298451`.
 
 To approve a request, open the list and copy its request ID into **Approve request**. The member's requested dates are approved as submitted. To assign different dates or grant time off without a request, choose **Grant days off** and enter the member's Discord ID, start date, and number of days. Reject an obsolete pending request separately.
 
 Member start dates accept the day before or after an abbreviated or full English month, such as `10 Sep`, `Sep 10`, or `10 September`. Past start dates are rejected. Periods include both the start and end date, and can last 1–365 days. Overlapping grants are allowed; any applicable grant excuses the member. Revoking a grant voids that entire grant, including in later historical reports. It does not cancel other overlapping grants. Admins can grant retroactive days off, but this cannot retract reminders already sent. Members can request today or future dates and have up to five pending requests.
 
-All command responses and the admin panel are private to the person using them. Members see approval or rejection through `/timeoff-status`; the bot does not send DMs. Only the end-of-day reminder intentionally pings members.
+All command responses and the admin panel are private to the person using them. Members see approval or rejection through `/clan action:My time off`; the bot does not send DMs. Only the end-of-day reminder intentionally pings members.
 
 ## Setup
 
@@ -77,6 +77,6 @@ The supplied pointing-hand image is bundled as `assets/author-icon.png`, the sma
 
 Run `npm.cmd test` for local tests of date boundaries, Patient-only filtering, inclusive exemptions, expiry, access checks, nickname restoration, persistence, reminder batching, midnight processing and interrupted-send recovery. Tests use fake Discord members/channels and never connect to Discord.
 
-For a live check in a test server with the configured role: start the bot, confirm a missing Patient gets the label, upload an image, and confirm the label clears. Request time off, approve it in `/donation-admin`, and check that `/donations` lists the member as Excused. Confirm a non-admin cannot open the admin panel. At the next local midnight, check that only missing, non-excused Patients are pinged for the day that just ended.
+For a live check in a test server with the configured role: start the bot, confirm a missing Patient gets the label, upload an image, and confirm the label clears. Request time off, approve it in `/clan action:Admin panel`, and check that `/clan action:Donation report` lists the member as Excused. Confirm a non-admin cannot open the admin panel. At the next local midnight, check that only missing, non-excused Patients are pinged for the day that just ended.
 
 References: [discord.js API](https://discord.js.org/docs/packages/discord.js/stable) and [Discord gateway intents](https://docs.discord.com/developers/events/gateway).
