@@ -2,10 +2,14 @@ import { PermissionFlagsBits } from 'discord.js';
 import { fetchMembers } from './members.js';
 import { isFormerMember } from './configuration.js';
 
+export const isAsylumStaff = member => [...member.roles.cache.values()]
+  .some(role => role.name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'asylum staff');
+const excludesMemberRole = (member, settings) => isFormerMember(member, settings) || isAsylumStaff(member);
+
 export async function assignMemberRoles(guild, settings) {
   const members = await fetchMembers(guild);
   const candidates = [...members.values()].filter(member => !member.user.bot
-    && isFormerMember(member, settings) === member.roles.cache.has(settings.memberRoleId));
+    && excludesMemberRole(member, settings) === member.roles.cache.has(settings.memberRoleId));
   const errors = [];
   if (!candidates.length) return { members, errors };
   let role;
@@ -19,17 +23,17 @@ export async function assignMemberRoles(guild, settings) {
 
   } catch (error) { return { members, errors: [error.message] }; }
   const privileged = role.permissions.has(PermissionFlagsBits.Administrator) || role.permissions.has(PermissionFlagsBits.ManageRoles);
-  if (privileged && candidates.some(member => !isFormerMember(member, settings))) errors.push('Choose a regular member role without Administrator or Manage Roles for automatic assignment.');
+  if (privileged && candidates.some(member => !excludesMemberRole(member, settings))) errors.push('Choose a regular member role without Administrator or Manage Roles for automatic assignment.');
   for (const member of candidates) {
-    const former = isFormerMember(member, settings);
-    if (!former && privileged) continue;
+    const excluded = excludesMemberRole(member, settings);
+    if (!excluded && privileged) continue;
     try {
       // Use the single-role endpoint; preserve all other manually assigned roles.
-      const updated = former
-        ? await member.roles.remove(role.id, 'Visitor/no-longer-a-member role takes precedence')
+      const updated = excluded
+        ? await member.roles.remove(role.id, 'Staff or visitor/no-longer-a-member role takes precedence')
         : await member.roles.add(role.id, 'Automatically assign clan member role');
       members.set(member.id, updated);
-    } catch (error) { errors.push(`Cannot ${former ? 'remove' : 'assign'} member role ${former ? 'from' : 'to'} ${member.id}: ${error.message}`); }
+    } catch (error) { errors.push(`Cannot ${excluded ? 'remove' : 'assign'} member role ${excluded ? 'from' : 'to'} ${member.id}: ${error.message}`); }
   }
   return { members, errors };
 }

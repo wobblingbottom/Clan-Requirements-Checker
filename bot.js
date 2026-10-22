@@ -14,7 +14,7 @@ import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } 
 import { getSettings, validateSettings, saveSettings, isFormerMember } from './configuration.js';
 import { SetupSessions, setupView } from './setup.js';
 import { DonationBreakManager } from './donation-breaks.js';
-import { assignMemberRoles } from './member-roles.js';
+import { assignMemberRoles, isAsylumStaff } from './member-roles.js';
 import { breakModal, breaksView, BREAK_MODAL } from './break-panel.js';
 
 const { DISCORD_TOKEN, GUILD_ID } = process.env;
@@ -202,6 +202,7 @@ client.on(Events.GuildMemberAdd, member => {
 client.on(Events.GuildMemberUpdate, (previous, member) => {
   const config = settings();
   if (member.guild.id === GUILD_ID && (isFormerMember(previous, config) !== isFormerMember(member, config)
+      || isAsylumStaff(previous) !== isAsylumStaff(member)
       || previous.roles.cache.has(config.memberRoleId) !== member.roles.cache.has(config.memberRoleId))) schedule();
 });
 

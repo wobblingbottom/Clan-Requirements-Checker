@@ -101,3 +101,39 @@ test('privileged member role can be removed but never automatically granted', as
   assert.equal(result.errors.length, 1);
   assert.deepEqual(f.assigned, []);
 });
+
+
+test('Asylum Staff removes member role, blocks reassignments and allows membership after staff removal', async () => {
+  const f = fixture();
+  const staffId = '99999999999999999';
+  const staff = f.make('leader', [f.config.memberRoleId, staffId, 'other']);
+  staff.roles.cache.set(staffId, { name: 'Asylum Staff' });
+  let removed = 0;
+  staff.roles.remove = async roleId => {
+    removed++;
+    assert.equal(roleId, f.config.memberRoleId);
+    const updated = f.make('leader', [staffId, 'other']);
+    updated.roles.cache.set(staffId, { name: 'Asylum Staff' });
+    f.members.set('leader', updated);
+    return updated;
+  };
+  f.members.set('leader', staff);
+  let result = await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(result.errors, []);
+  assert.equal(removed, 1);
+  assert.deepEqual([...result.members.get('leader').roles.cache.keys()], [staffId, 'other']);
+  await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(f.assigned, []);
+  f.members.set('leader', f.make('leader', ['other']));
+  await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
+});
+
+test('other leader roles remain eligible for the member role', async () => {
+  const f = fixture();
+  const leader = f.make('leader', [f.config.leaderRoleIds[0]]);
+  leader.roles.cache.set(f.config.leaderRoleIds[0], { name: 'Leader' });
+  f.members.set('leader', leader);
+  await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
+});
