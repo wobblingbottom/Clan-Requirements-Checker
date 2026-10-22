@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validDay } from './tracking.js';
 import { breakForDay } from './break-state.js';
-import { getSettings, defaultSettings, requestRoleIds, isFormerMember } from './configuration.js';
+import { getSettings, defaultSettings, requestRoleIds, isFormerMember, isClanLeader } from './configuration.js';
 
 export const PATIENT_ROLE_ID = '1532826238572298451';
 export const TIMEOFF_ROLE_IDS = [
@@ -42,7 +42,7 @@ export function taggedName(base, tag = TAG) {
 
 export function classify(members, submissions, state, day) {
   const settings = getSettings(state);
-  const roster = [...members.values()].filter(m => !m.user.bot && m.roles.cache.has(settings.memberRoleId) && !isFormerMember(m, settings));
+  const roster = [...members.values()].filter(m => !m.user.bot && m.roles.cache.has(settings.memberRoleId) && !isFormerMember(m, settings) && !isClanLeader(m, settings));
   const pause = breakForDay(state, day);
   const excused = roster.filter(m => pause || isExcused(state, m.id, day));
   const required = roster.filter(m => !pause && !isExcused(state, m.id, day));

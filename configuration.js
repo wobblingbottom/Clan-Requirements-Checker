@@ -15,6 +15,10 @@ export function getSettings(data = {}) {
   return structuredClone({ ...defaultSettings(), ...data.settings });
 }
 export const isFormerMember = (member, settings) => Boolean(settings.formerMemberRoleId && member.roles.cache.has(settings.formerMemberRoleId));
+export const isAsylumStaff = member => [...member.roles.cache.values()]
+  .some(role => role.name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'asylum staff');
+export const isClanLeader = (member, settings) => isAsylumStaff(member)
+  || settings.leaderRoleIds.some(roleId => member.roles.cache.has(roleId));
 export const requestRoleIds = settings => [...new Set([
   settings.memberRoleId, ...settings.leaderRoleIds, ...settings.timeoffRoleIds,
 ])];

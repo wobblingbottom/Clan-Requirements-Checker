@@ -1,9 +1,8 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { fetchMembers } from './members.js';
-import { isFormerMember } from './configuration.js';
+import { isFormerMember, isAsylumStaff } from './configuration.js';
 
-export const isAsylumStaff = member => [...member.roles.cache.values()]
-  .some(role => role.name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'asylum staff');
+export { isAsylumStaff } from './configuration.js';
 const excludesMemberRole = (member, settings) => isFormerMember(member, settings) || isAsylumStaff(member);
 
 export async function assignMemberRoles(guild, settings) {
