@@ -96,6 +96,8 @@ export class Automation {
       this.store.save();
       return;
     }
+    // An active break also silences pending reminders for earlier donation days.
+    if (activeBreak(this.store.data, dayAt(this.now(), this.timezone))) return;
     const report = await this.report(day);
     let job = this.store.data.jobs[day];
     if (!job) {
@@ -142,6 +144,8 @@ export class Automation {
       }
       const ids = batch.ids.filter(id => stillMissing.has(id));
       if (ids.length) {
+        // Recheck after asynchronous history scans in case the break just started.
+        if (activeBreak(this.store.data, dayAt(this.now(), this.timezone))) return;
         const nonce = createHash('sha256').update(`${this.guild.id}:${day}:${index}`).digest('hex').slice(0, 24);
         const message = await this.reminder.send({
           ...reminderMessage(day, this.timezone, ids, batch.longTermIds?.filter(id => stillMissing.has(id))),

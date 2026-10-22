@@ -196,3 +196,30 @@ test('existing announcements refresh to the new layout without posting a second 
   assert.equal(message.embeds[0].footer.text, 'Crazyland Asylum');
   assert.ok(message.embeds[0].footer.icon_url);
 });
+
+
+test('active break silences pending reminders from before the break without consuming the job', async () => {
+  const f = fixture(); await create(f);
+  const job = { createdAt: 1, batches: [{ ids: ['member'], sent: false }] };
+  f.store.data.jobs['2026-10-20'] = job;
+  const automation = new Automation({ store: f.store, timezone: 'Europe/Paris', now: () => Date.parse('2026-10-22T12:00:00Z') });
+  automation.report = async () => { throw Error('Must not scan or ping during an active break'); };
+  await automation.closeDay('2026-10-20');
+  assert.equal(f.store.data.jobs['2026-10-20'], job);
+  assert.equal(job.batches[0].sent, false);
+});
+
+test('break starting during reminder history lookup prevents the pending ping', async () => {
+  const f = fixture();
+  let now = Date.parse('2026-10-20T21:59:00Z');
+  f.store.data.donationBreaks = { halloween: { start: '2026-10-21', end: '2026-11-01' } };
+  const job = { createdAt: now, batches: [{ ids: ['member'], sent: false }] };
+  f.store.data.jobs['2026-10-19'] = job;
+  const automation = new Automation({ store: f.store, timezone: 'Europe/Paris', now: () => now,
+    reminder: { messages: { fetch: async () => { now = Date.parse('2026-10-20T22:00:00Z'); return new Map(); } },
+      send: async () => { assert.fail('No daily ping during the break'); } } });
+  automation.report = async () => ({ missing: [{ id: 'member' }] });
+  await automation.closeDay('2026-10-19');
+  assert.equal(job.batches[0].sent, false);
+  assert.equal(f.store.data.jobs['2026-10-19'], job);
+});
