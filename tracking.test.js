@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayAt, validDay, hasImage, collectSubmissions, latestScreenshot } from './tracking.js';
+import { dayAt, hourAt, validDay, hasImage, collectSubmissions, latestScreenshot } from './tracking.js';
 
 test('Paris calendar dates cross UTC midnight and daylight saving boundaries', () => {
   assert.equal(dayAt(Date.parse('2026-09-14T22:05:00Z'), 'Europe/Paris'), '2026-09-15');
@@ -8,6 +8,11 @@ test('Paris calendar dates cross UTC midnight and daylight saving boundaries', (
   assert.equal(dayAt(Date.parse('2026-03-29T01:05:00Z'), 'Europe/Paris'), '2026-03-29');
   assert.equal(validDay('2026-02-30'), false);
   assert.equal(validDay('2024-02-29'), true);
+});
+
+test('Paris local hour controls the delayed daily reminder', () => {
+  assert.equal(hourAt(Date.parse('2026-09-15T03:59:00Z'), 'Europe/Paris'), 5);
+  assert.equal(hourAt(Date.parse('2026-09-15T04:00:00Z'), 'Europe/Paris'), 6);
 });
 const screenshot = { contentType: 'image/png', width: 800, height: 600 };
 const msg = (id, timestamp, author = 'member', attachment = screenshot) => ({

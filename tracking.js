@@ -6,6 +6,12 @@ export function dayAt(timestamp, timezone) {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+export function hourAt(timestamp, timezone) {
+  return Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone, hour: '2-digit', hourCycle: 'h23',
+  }).format(new Date(timestamp)));
+}
+
 export function validDay(day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
   const date = new Date(`${day}T00:00:00Z`);

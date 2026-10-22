@@ -12,9 +12,9 @@ function makeStore(t, today = '2026-09-14') {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return new Store(join(dir, 'state.json'), today, 'guild', 'Europe/Paris');
 }
-function member(id, { role = true, bot = false, nickname = null, manageable = true } = {}) {
+function member(id, { role = true, bot = false, nickname = null, manageable = true, joinedTimestamp } = {}) {
   return {
-    id, user: { bot }, nickname, manageable, edits: [],
+    id, user: { bot }, nickname, manageable, joinedTimestamp, edits: [],
     get displayName() { return this.nickname || `Name-${id}`; },
     roles: { cache: new Map(role ? [[PATIENT_ROLE_ID, {}]] : []) },
     async setNickname(value) { this.edits.push(value); this.nickname = value; },
@@ -116,6 +116,28 @@ test('approved time off applies Vacation and transitions cleanly between nicknam
   assert.equal(m.nickname, 'Traveler');
   assert.equal(store.data.nicknames.away, undefined);
 });
+test('new members wait until their first 6 AM ping before receiving the missing tag', async t => {
+  const store = makeStore(t);
+  const { automation } = fakeAutomation(t, store);
+  const newcomer = member('new', { joinedTimestamp: Date.parse('2026-09-15T01:00:00Z') });
+  const members = new Map([[newcomer.id, newcomer]]);
+  automation.report = async () => ({ missing: [newcomer], excused: [], pause: false, members });
+  automation.now = () => Date.parse('2026-09-15T03:59:00Z');
+  await automation.syncToday();
+  assert.equal(newcomer.nickname, null);
+  automation.now = () => Date.parse('2026-09-15T04:01:00Z');
+  await automation.syncToday();
+  assert.equal(newcomer.nickname, `Name-new ${TAG}`);
+});
+test('members are excluded from donation reports for days before they joined', async t => {
+  const store = makeStore(t);
+  const { automation } = fakeAutomation(t, store);
+  const newcomer = member('new', { joinedTimestamp: Date.parse('2026-09-15T10:00:00Z') });
+  const members = new Map([[newcomer.id, newcomer]]);
+  automation.channel.messages = { fetch: async () => new Map() };
+  assert.equal((await automation.report('2026-09-14', members)).roster.length, 0);
+  assert.equal((await automation.report('2026-09-15', members)).roster.length, 1);
+});
 
 function fakeAutomation(t, store) {
   const history = new Map();
@@ -134,9 +156,10 @@ function fakeAutomation(t, store) {
     reminder, store, timezone: 'Europe/Paris', botId: 'bot', now: () => Date.parse('2026-09-14T22:01:00Z') });
   return { automation, sent, history, reminder };
 }
-test('midnight closes the previous local day once and skips pre-install days', async t => {
+test('6 AM closes the previous local day once and skips pre-install days', async t => {
   const store = makeStore(t);
   const { automation, sent } = fakeAutomation(t, store);
+  automation.now = () => Date.parse('2026-09-15T04:01:00Z');
   const m = member('a');
   const dates = [];
   automation.report = async day => { dates.push(day); return { missing: [m] }; };
@@ -149,6 +172,16 @@ test('midnight closes the previous local day once and skips pre-install days', a
   assert.ok(sent[0].content.endsWith('<@a>'));
   assert.equal(sent[0].embeds[0].toJSON().color, 0xf45f77);
   assert.equal(store.data.lastClosedDay, '2026-09-14');
+});
+test('the previous day is not closed before 6 AM local time', async t => {
+  const store = makeStore(t);
+  const { automation, sent } = fakeAutomation(t, store);
+  automation.now = () => Date.parse('2026-09-15T03:59:00Z');
+  automation.report = async () => ({ missing: [member('a')] });
+  automation.syncToday = async () => {};
+  await automation.tick();
+  assert.equal(sent.length, 0);
+  assert.equal(store.data.lastClosedDay, '2026-09-13');
 });
 test('exempt and submitted Patients are excluded from actual reminder mentions', async t => {
   const store = makeStore(t);
@@ -291,6 +324,7 @@ test('slash commands, private admin panel and all modals serialize against insta
 test('failed end-of-day reminder still allows today nickname cleanup and retries next tick', async t => {
   const store = makeStore(t);
   const { automation } = fakeAutomation(t, store);
+  automation.now = () => Date.parse('2026-09-15T04:01:00Z');
   let synced = 0;
   automation.closeDay = async () => { throw new Error('Cannot send reminder'); };
   automation.syncToday = async () => { synced++; };

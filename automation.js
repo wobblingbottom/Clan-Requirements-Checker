@@ -1,4 +1,4 @@
-import { dayAt, collectSubmissions } from './tracking.js';
+import { dayAt, hourAt, collectSubmissions } from './tracking.js';
 import { classify, shiftDay, taggedName, TAG, VACATION_TAG, isExcused } from './state.js';
 import { createHash } from 'node:crypto';
 import { reminderMessage, matchesReminder } from './messages.js';
@@ -38,7 +38,6 @@ export async function syncNickname(member, missing, store, vacation = false, cle
     store.save();
   }
 }
-
 // Check history before retrying an interrupted send, to avoid duplicate reminders
 // after a crash between Discord accepting a message and the local state save.
 async function findReminder(channel, day, batchIndex, batchIds, since, botId) {
@@ -67,10 +66,14 @@ export class Automation {
     const [members, submissions] = await Promise.all([
       roster ?? fetchMembers(this.guild), collectSubmissions(this.channel, day, this.timezone),
     ]);
-    return { ...classify(members, submissions, this.store.data, day), members, submissions };
+    const eligibleMembers = new Map([...members].filter(([, member]) =>
+      !member.joinedTimestamp || dayAt(member.joinedTimestamp, this.timezone) <= day));
+    return { ...classify(eligibleMembers, submissions, this.store.data, day), members, submissions };
   }
   async syncToday() {
-    const today = dayAt(this.now(), this.timezone);
+    const now = this.now();
+    const today = dayAt(now, this.timezone);
+    const currentHour = hourAt(now, this.timezone);
     const roleSync = await this.syncMemberRoles?.();
     const report = await this.report(today, roleSync?.members);
     const missing = new Set(report.missing.map(m => m.id));
@@ -79,7 +82,15 @@ export class Automation {
     const settings = getSettings(this.store.data);
     for (const member of report.members.values()) {
       const leader = isClanLeader(member, settings);
-      try { await syncNickname(member, !leader && missing.has(member.id), this.store, !leader && vacation.has(member.id), leader || isFormerMember(member, settings)); }
+      try {
+        const joinedDay = member.joinedTimestamp ? dayAt(member.joinedTimestamp, this.timezone) : null;
+        const joinedHour = member.joinedTimestamp ? hourAt(member.joinedTimestamp, this.timezone) : null;
+        const firstPingDay = joinedDay ? shiftDay(joinedDay, joinedHour < 6 ? 0 : 1) : null;
+        const waitingForFirstPing = firstPingDay
+          && (today < firstPingDay || (today === firstPingDay && currentHour < 6));
+        await syncNickname(member, !leader && missing.has(member.id) && !waitingForFirstPing,
+          this.store, !leader && vacation.has(member.id), report.pause || leader || isFormerMember(member, settings));
+      }
       catch (error) { this.nicknameErrors.push(error.message); }
     }
     // Members who left cannot have their old server nickname restored.
@@ -163,10 +174,11 @@ export class Automation {
   async tick() {
     const errors = [];
     try {
-      const yesterday = shiftDay(dayAt(this.now(), this.timezone), -1);
+      const now = this.now();
+      const latestClosedDay = shiftDay(dayAt(now, this.timezone), hourAt(now, this.timezone) >= 6 ? -1 : -2);
       const pausedToday = activeBreak(this.store.data, dayAt(this.now(), this.timezone));
       // Catch up after downtime, bounded per tick to keep the bot responsive.
-      for (let n = 0; n < 7 && !pausedToday && this.store.data.lastClosedDay < yesterday; n++) {
+      for (let n = 0; n < 7 && !pausedToday && this.store.data.lastClosedDay < latestClosedDay; n++) {
         await this.closeDay(shiftDay(this.store.data.lastClosedDay, 1));
       }
     } catch (error) { errors.push(error); }

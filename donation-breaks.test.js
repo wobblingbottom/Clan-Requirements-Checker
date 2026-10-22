@@ -133,10 +133,12 @@ test('break dates skip reminders and streak increments, then normal checks resum
 
 test('global break removes missing-proof labels without labelling everyone as on vacation',async()=>{
   const f=fixture();await create(f);const m={id:'member',user:{bot:false},manageable:true,nickname:`Name ${TAG}`,displayName:'Name',roles:{cache:new Map([[PATIENT_ROLE_ID,{}]])},async setNickname(value){this.nickname=value;}};
+  const orphan={id:'orphan',user:{bot:false},manageable:true,nickname:`Orphan ${TAG}`,displayName:'Orphan',roles:{cache:new Map([[PATIENT_ROLE_ID,{}]])},async setNickname(value){this.nickname=value;}};
   f.store.data.nicknames.member={original:'Name',applied:m.nickname};
   const automation=new Automation({store:f.store,timezone:'Europe/Paris',now:()=>Date.parse('2026-10-21T12:00:00Z')});
-  automation.report=async day=>({...classify(new Map([[m.id,m]]),new Map(),f.store.data,day),members:new Map([[m.id,m]])});
-  await automation.syncToday();assert.equal(m.nickname,'Name');
+  const members=new Map([[m.id,m],[orphan.id,orphan]]);
+  automation.report=async day=>({...classify(members,new Map(),f.store.data,day),members});
+  await automation.syncToday();assert.equal(m.nickname,'Name');assert.equal(orphan.nickname,'Orphan');
 });
 
 test('break controls serialize and setup cannot change the donation channel before lock restoration',async()=>{
