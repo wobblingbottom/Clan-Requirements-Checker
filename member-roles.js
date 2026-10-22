@@ -1,9 +1,9 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { fetchMembers } from './members.js';
-import { isFormerMember, isAsylumStaff } from './configuration.js';
+import { isFormerMember, isClanLeader } from './configuration.js';
 
 export { isAsylumStaff } from './configuration.js';
-const excludesMemberRole = (member, settings) => isFormerMember(member, settings) || isAsylumStaff(member);
+const excludesMemberRole = (member, settings) => isFormerMember(member, settings) || isClanLeader(member, settings);
 
 export async function assignMemberRoles(guild, settings) {
   const members = await fetchMembers(guild);
@@ -29,7 +29,7 @@ export async function assignMemberRoles(guild, settings) {
     try {
       // Use the single-role endpoint; preserve all other manually assigned roles.
       const updated = excluded
-        ? await member.roles.remove(role.id, 'Staff or visitor/no-longer-a-member role takes precedence')
+        ? await member.roles.remove(role.id, 'Leadership, staff or visitor/no-longer-a-member role takes precedence')
         : await member.roles.add(role.id, 'Automatically assign clan member role');
       members.set(member.id, updated);
     } catch (error) { errors.push(`Cannot ${excluded ? 'remove' : 'assign'} member role ${excluded ? 'from' : 'to'} ${member.id}: ${error.message}`); }

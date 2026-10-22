@@ -129,11 +129,27 @@ test('Asylum Staff removes member role, blocks reassignments and allows membersh
   assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
 });
 
-test('other leader roles remain eligible for the member role', async () => {
-  const f = fixture();
-  const leader = f.make('leader', [f.config.leaderRoleIds[0]]);
-  leader.roles.cache.set(f.config.leaderRoleIds[0], { name: 'Leader' });
-  f.members.set('leader', leader);
-  await assignMemberRoles(f.guild, f.config);
-  assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
+test('all configured leadership roles remove membership, preserve other roles and block reassignment', async () => {
+  for (const leaderRoleId of fixture().config.leaderRoleIds) {
+    const f = fixture();
+    const leader = f.make('leader', [leaderRoleId, f.config.memberRoleId, 'other']);
+    let removals = 0;
+    leader.roles.remove = async roleId => {
+      assert.equal(roleId, f.config.memberRoleId);
+      removals++;
+      const updated = f.make('leader', [leaderRoleId, 'other']);
+      f.members.set('leader', updated);
+      return updated;
+    };
+    f.members.set('leader', leader);
+    const result = await assignMemberRoles(f.guild, f.config);
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual([...result.members.get('leader').roles.cache.keys()], [leaderRoleId, 'other']);
+    await assignMemberRoles(f.guild, f.config);
+    assert.equal(removals, 1);
+    assert.deepEqual(f.assigned, []);
+    f.members.set('leader', f.make('leader', ['other']));
+    await assignMemberRoles(f.guild, f.config);
+    assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
+  }
 });
