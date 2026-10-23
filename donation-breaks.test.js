@@ -5,7 +5,7 @@ import { DonationBreakManager, POSTING_BITS } from './donation-breaks.js';
 import { breakForDay, activeBreak } from './break-state.js';
 import { defaultSettings, saveSettings } from './configuration.js';
 import { checkAccess } from './access.js';
-import { Automation } from './automation.js';
+import { Automation, channelHasBreakLock } from './automation.js';
 import { classify, PATIENT_ROLE_ID, TAG } from './state.js';
 import { breaksView, breakModal } from './break-panel.js';
 
@@ -139,6 +139,20 @@ test('global break removes missing-proof labels without labelling everyone as on
   const members=new Map([[m.id,m],[orphan.id,orphan]]);
   automation.report=async day=>({...classify(members,new Map(),f.store.data,day),members});
   await automation.syncToday();assert.equal(m.nickname,'Name');assert.equal(orphan.nickname,'Orphan');
+});
+
+test('Discord break lock suppresses reminders and clears tags even if saved break state is lost',async()=>{
+  const f=fixture();const record=await create(f);await f.manager.sync();
+  assert.equal(channelHasBreakLock(f.channel,f.guild.id,f.manager.botId),true);
+  delete f.store.data.donationBreaks;
+  const m={id:'member',user:{bot:false},manageable:true,nickname:`Name ${TAG}`,displayName:'Name',roles:{cache:new Map([[PATIENT_ROLE_ID,{}]])},async setNickname(value){this.nickname=value;}};
+  const automation=new Automation({guild:f.guild,channel:f.channel,reminder:f.channel,store:f.store,
+    timezone:'Europe/Paris',botId:f.manager.botId,now:()=>Date.parse('2026-10-21T12:00:00Z')});
+  automation.report=async()=>({missing:[m],excused:[],pause:false,members:new Map([[m.id,m]])});
+  await automation.syncToday();assert.equal(m.nickname,'Name');
+  let sent=false;f.channel.send=async()=>{sent=true;return{id:'reminder'};};
+  await automation.closeDay('2026-10-20');assert.equal(sent,false);
+  assert.equal(record.lock.applied,true);
 });
 
 test('break controls serialize and setup cannot change the donation channel before lock restoration',async()=>{

@@ -5,6 +5,18 @@ import { reminderMessage, matchesReminder } from './messages.js';
 import { fetchMembers } from './members.js';
 import { getSettings, isFormerMember, isClanLeader } from './configuration.js';
 import { breakForDay, activeBreak } from './break-state.js';
+import { PermissionFlagsBits } from 'discord.js';
+
+export function channelHasBreakLock(channel, guildId, botId) {
+  const overwrites = channel?.permissionOverwrites?.cache;
+  if (!overwrites?.get) return false;
+  const denied = overwrite => Boolean(BigInt(overwrite?.deny?.bitfield ?? 0) & PermissionFlagsBits.SendMessages);
+  const allowed = overwrite => Boolean(BigInt(overwrite?.allow?.bitfield ?? 0) & PermissionFlagsBits.SendMessages);
+  const everyone = overwrites.get(guildId);
+  const bot = overwrites.get(botId);
+  const others = [...overwrites.values()].filter(item => item.id !== guildId && item.id !== botId);
+  return denied(everyone) && allowed(bot) && others.every(denied);
+}
 
 export async function syncNickname(member, missing, store, vacation = false, clearOrphanTag = false) {
   let record = store.data.nicknames[member.id];
@@ -70,13 +82,18 @@ export class Automation {
       !member.joinedTimestamp || dayAt(member.joinedTimestamp, this.timezone) <= day));
     return { ...classify(eligibleMembers, submissions, this.store.data, day), members, submissions };
   }
+  paused(day = dayAt(this.now(), this.timezone)) {
+    return Boolean(activeBreak(this.store.data, day)
+      || channelHasBreakLock(this.channel, this.guild?.id, this.botId));
+  }
   async syncToday() {
     const now = this.now();
     const today = dayAt(now, this.timezone);
     const currentHour = hourAt(now, this.timezone);
     const roleSync = await this.syncMemberRoles?.();
     const report = await this.report(today, roleSync?.members);
-    const missing = new Set(report.missing.map(m => m.id));
+    const paused = report.pause || this.paused(today);
+    const missing = new Set(paused ? [] : report.missing.map(m => m.id));
     const vacation = new Set(report.excused.filter(m => !report.pause || isExcused(this.store.data, m.id, today)).map(m => m.id));
     this.nicknameErrors = [...(roleSync?.errors || [])];
     const settings = getSettings(this.store.data);
@@ -89,7 +106,7 @@ export class Automation {
         const waitingForFirstPing = firstPingDay
           && (today < firstPingDay || (today === firstPingDay && currentHour < 6));
         await syncNickname(member, !leader && missing.has(member.id) && !waitingForFirstPing,
-          this.store, !leader && vacation.has(member.id), report.pause || leader || isFormerMember(member, settings));
+          this.store, !leader && vacation.has(member.id), paused || leader || isFormerMember(member, settings));
       }
       catch (error) { this.nicknameErrors.push(error.message); }
     }
@@ -109,7 +126,7 @@ export class Automation {
       return;
     }
     // An active break also silences pending reminders for earlier donation days.
-    if (activeBreak(this.store.data, dayAt(this.now(), this.timezone))) return;
+    if (this.paused()) return;
     const report = await this.report(day);
     let job = this.store.data.jobs[day];
     if (!job) {
@@ -157,7 +174,7 @@ export class Automation {
       const ids = batch.ids.filter(id => stillMissing.has(id));
       if (ids.length) {
         // Recheck after asynchronous history scans in case the break just started.
-        if (activeBreak(this.store.data, dayAt(this.now(), this.timezone))) return;
+        if (this.paused()) return;
         const nonce = createHash('sha256').update(`${this.guild.id}:${day}:${index}`).digest('hex').slice(0, 24);
         const message = await this.reminder.send({
           ...reminderMessage(day, this.timezone, ids, batch.longTermIds?.filter(id => stillMissing.has(id))),
@@ -176,7 +193,7 @@ export class Automation {
     try {
       const now = this.now();
       const latestClosedDay = shiftDay(dayAt(now, this.timezone), hourAt(now, this.timezone) >= 6 ? -1 : -2);
-      const pausedToday = activeBreak(this.store.data, dayAt(this.now(), this.timezone));
+      const pausedToday = this.paused(dayAt(this.now(), this.timezone));
       // Catch up after downtime, bounded per tick to keep the bot responsive.
       for (let n = 0; n < 7 && !pausedToday && this.store.data.lastClosedDay < latestClosedDay; n++) {
         await this.closeDay(shiftDay(this.store.data.lastClosedDay, 1));
