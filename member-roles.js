@@ -7,24 +7,25 @@ const excludesMemberRole = (member, settings) => isFormerMember(member, settings
 
 const transitioning = new Set();
 
-export async function cycleRemovedRole(previous, member, settings) {
-  if (member.user.bot || isClanLeader(member, settings)) return;
-  const cycle = [settings.memberRoleId, settings.formerMemberRoleId, settings.visitorRoleId];
-  // Ignore role swaps and cleanup events when another status role is present.
-  if (cycle.some(id => id && member.roles.cache.has(id))) return;
-  const removed = cycle.findIndex(id => id && previous.roles.cache.has(id));
-  if (removed < 0 || !cycle[(removed + 1) % cycle.length]) return;
+export async function reconcileMembershipRoles(previous, member, settings) {
+  if (member.user.bot) return;
+  const statuses = [settings.memberRoleId, settings.formerMemberRoleId, settings.visitorRoleId].filter(Boolean);
+  const added = statuses.filter(id => member.roles.cache.has(id) && !previous.roles.cache.has(id));
+  if (!added.length) return;
+  // The newly assigned status wins. Removal events never advance membership.
+  const selected = added.at(-1);
+  const conflicts = statuses.filter(id => id !== selected && member.roles.cache.has(id));
+  if (!conflicts.length) return;
   const key = member.guild.id + ':' + member.id;
-  if (transitioning.has(key)) return;
   transitioning.add(key);
   try {
-    const id = cycle[(removed + 1) % cycle.length];
-    const role = await member.guild.roles.fetch(id);
-    if (!role || role.managed || !role.editable || role.id === member.guild.id
-        || role.permissions.has(PermissionFlagsBits.Administrator) || role.permissions.has(PermissionFlagsBits.ManageRoles)) {
-      throw new Error('Role cycle needs normal assignable roles below the bot role.');
+    for (const id of conflicts) {
+      const role = await member.guild.roles.fetch(id);
+      if (!role || role.managed || !role.editable || role.id === member.guild.id) {
+        throw new Error('Place the bot role above all three membership roles.');
+      }
     }
-    await member.roles.add(id, 'Advance Patient / Patient No More / Visitor role cycle');
+    for (const id of conflicts) await member.roles.remove(id, 'Newly assigned membership role replaces other membership roles');
   } finally { transitioning.delete(key); }
 }
 
@@ -48,6 +49,7 @@ export async function assignMemberRoles(guild, settings) {
   const privileged = role.permissions.has(PermissionFlagsBits.Administrator) || role.permissions.has(PermissionFlagsBits.ManageRoles);
   if (privileged && candidates.some(member => !excludesMemberRole(member, settings))) errors.push('Choose a regular member role without Administrator or Manage Roles for automatic assignment.');
   for (const member of candidates) {
+    if (transitioning.has(guild.id + ':' + member.id)) continue;
     const excluded = excludesMemberRole(member, settings);
     if (!excluded && privileged) continue;
     try {

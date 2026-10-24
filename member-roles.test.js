@@ -154,25 +154,34 @@ test('all configured leadership roles remove membership, preserve other roles an
   }
 });
 
-// Each removal advances once; bot-generated additions must not advance again.
-test('Patient, Patient No More and Visitor removals advance through the cycle', async () => {
-  const { cycleRemovedRole } = await import('./member-roles.js');
+test('newly assigned membership status replaces either other status and preserves unrelated roles', async () => {
+  const { reconcileMembershipRoles } = await import('./member-roles.js');
   const f = fixture();
   f.config.visitorRoleId = '77777777777777777';
-  const cycle = [f.config.memberRoleId, f.config.formerMemberRoleId, f.config.visitorRoleId];
-  for (let i = 0; i < cycle.length; i++) {
-    const previous = f.make('person', [cycle[i]]);
-    const current = f.make('person', ['other']);
-    current.guild = f.guild;
-    f.guild.roles.fetch = async id => ({ ...f.role, id });
-    await cycleRemovedRole(previous, current, f.config);
-    assert.deepEqual(f.assigned.at(-1), ['person', cycle[(i + 1) % 3]]);
-    const updated = f.members.get('person');
-    updated.guild = f.guild;
-    const count = f.assigned.length;
-    await cycleRemovedRole(current, updated, f.config);
-    assert.equal(f.assigned.length, count);
+  const statuses = [f.config.memberRoleId, f.config.formerMemberRoleId, f.config.visitorRoleId];
+  for (const selected of statuses) {
+    for (const old of statuses.filter(id => id !== selected)) {
+      const previous = f.make('person', [old, 'other']);
+      const current = f.make('person', [old, selected, 'other']);
+      current.guild = f.guild;
+      const removed = [];
+      current.roles.remove = async id => { removed.push(id); current.roles.cache.delete(id); return current; };
+      f.guild.roles.fetch = async id => ({ ...f.role, id });
+      await reconcileMembershipRoles(previous, current, f.config);
+      assert.deepEqual(removed, [old]);
+      assert.deepEqual([...current.roles.cache.keys()], [selected, 'other']);
+      await reconcileMembershipRoles(previous, current, f.config);
+      assert.equal(removed.length, 1);
+    }
   }
+});
+
+test('removal alone does not cycle membership roles', async () => {
+  const { reconcileMembershipRoles } = await import('./member-roles.js');
+  const f = fixture();
+  const current = f.make('person');
+  await reconcileMembershipRoles(f.make('person', [f.config.memberRoleId]), current, f.config);
+  assert.deepEqual(f.assigned, []);
 });
 
 test('Visitor prevents automatic Patient assignment', async () => {

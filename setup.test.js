@@ -149,6 +149,7 @@ test('Visitor role is selectable in Setup, displayed and saved', () => {
   const session = sessions.open('admin', 'guild', store.data);
   sessions.selectField(session, 'visitorRoleId');
   const initial = setupView(session);
+  assert.ok(initial.components[2].toJSON().components.some(button => button.label === 'Set Visitor role' && button.custom_id.endsWith(':visitor')));
   assert.ok(initial.components[0].toJSON().components[0].options.some(option => option.value === 'visitorRoleId' && option.label === 'Visitor role'));
   const visitorId = '88888888888888888';
   sessions.selectValues(session, [visitorId]);
