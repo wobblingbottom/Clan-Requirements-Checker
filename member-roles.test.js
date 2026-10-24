@@ -153,3 +153,33 @@ test('all configured leadership roles remove membership, preserve other roles an
     assert.deepEqual(f.assigned, [['leader', f.config.memberRoleId]]);
   }
 });
+
+// Each removal advances once; bot-generated additions must not advance again.
+test('Patient, Patient No More and Visitor removals advance through the cycle', async () => {
+  const { cycleRemovedRole } = await import('./member-roles.js');
+  const f = fixture();
+  f.config.visitorRoleId = '77777777777777777';
+  const cycle = [f.config.memberRoleId, f.config.formerMemberRoleId, f.config.visitorRoleId];
+  for (let i = 0; i < cycle.length; i++) {
+    const previous = f.make('person', [cycle[i]]);
+    const current = f.make('person', ['other']);
+    current.guild = f.guild;
+    f.guild.roles.fetch = async id => ({ ...f.role, id });
+    await cycleRemovedRole(previous, current, f.config);
+    assert.deepEqual(f.assigned.at(-1), ['person', cycle[(i + 1) % 3]]);
+    const updated = f.members.get('person');
+    updated.guild = f.guild;
+    const count = f.assigned.length;
+    await cycleRemovedRole(current, updated, f.config);
+    assert.equal(f.assigned.length, count);
+  }
+});
+
+test('Visitor prevents automatic Patient assignment', async () => {
+  const f = fixture();
+  f.config.visitorRoleId = '77777777777777777';
+  f.members.set('visitor', f.make('visitor', [f.config.visitorRoleId]));
+  const result = await assignMemberRoles(f.guild, f.config);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(f.assigned, []);
+});

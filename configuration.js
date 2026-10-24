@@ -6,7 +6,7 @@ export function defaultSettings() {
   return {
     donationChannelId: donation, reminderChannelId: donation,
     vacationChannelId: '1549128315095355422', adminChannelId: '1537173435611090944',
-    memberRoleId: '1532826238572298451', formerMemberRoleId: null,
+    memberRoleId: '1532826238572298451', formerMemberRoleId: null, visitorRoleId: null,
     leaderRoleIds: ['1532826140086112256', '1532826772624769316'],
     timeoffRoleIds: ['1532826889499185302'],
   };
@@ -14,7 +14,7 @@ export function defaultSettings() {
 export function getSettings(data = {}) {
   return structuredClone({ ...defaultSettings(), ...data.settings });
 }
-export const isFormerMember = (member, settings) => Boolean(settings.formerMemberRoleId && member.roles.cache.has(settings.formerMemberRoleId));
+export const isFormerMember = (member, settings) => Boolean([settings.formerMemberRoleId, settings.visitorRoleId].some(id => id && member.roles.cache.has(id)));
 export const isAsylumStaff = member => [...member.roles.cache.values()]
   .some(role => role.name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'asylum staff');
 export const isClanLeader = (member, settings) => isAsylumStaff(member)
@@ -29,6 +29,7 @@ export const SETTINGS_FIELDS = {
   adminChannelId: { label: 'Time-off review channel', kind: 'channel' },
   memberRoleId: { label: 'Tracked member role', kind: 'role' },
   formerMemberRoleId: { label: 'No longer a member role', kind: 'role', min: 0 },
+  visitorRoleId: { label: 'Visitor role', kind: 'role', min: 0 },
   leaderRoleIds: { label: 'Leader / approval roles', kind: 'roles', min: 1 },
   timeoffRoleIds: { label: 'Additional time-off roles', kind: 'roles', min: 0 },
 };
@@ -51,6 +52,8 @@ export function normalizeSettings(settings) {
     }
   }
   if (result.formerMemberRoleId === result.memberRoleId) throw new Error('Choose different tracked member and no-longer-a-member roles.');
+  const roles = [result.memberRoleId, result.formerMemberRoleId, result.visitorRoleId].filter(Boolean);
+  if (new Set(roles).size !== roles.length) throw new Error('Choose different Patient, Patient No More and Visitor roles.');
   return result;
 }
 
@@ -72,7 +75,7 @@ export async function validateSettings(guild, settings) {
     }
     channels[key] = channel;
   }
-  for (const roleId of new Set([...requestRoleIds(settings), ...[settings.formerMemberRoleId].filter(Boolean)])) {
+  for (const roleId of new Set([...requestRoleIds(settings), ...[settings.formerMemberRoleId, settings.visitorRoleId].filter(Boolean)])) {
     const role = await guild.roles.fetch(roleId);
     if (!role || role.guild.id !== guild.id || role.id === guild.id || role.managed) {
       throw new Error('Choose member and leadership roles from this server; everyone and bot-managed roles are not supported.');

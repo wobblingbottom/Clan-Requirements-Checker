@@ -14,7 +14,7 @@ import { VACATION_BUTTON, VACATION_MODAL, vacationModal, ensureVacationNotice } 
 import { getSettings, validateSettings, saveSettings, isFormerMember, isClanLeader } from './configuration.js';
 import { SetupSessions, setupView } from './setup.js';
 import { DonationBreakManager } from './donation-breaks.js';
-import { assignMemberRoles } from './member-roles.js';
+import { assignMemberRoles, cycleRemovedRole } from './member-roles.js';
 import { updatePatientPresence } from './presence.js';
 import { breakModal, breaksView, BREAK_MODAL } from './break-panel.js';
 
@@ -207,8 +207,11 @@ client.on(Events.GuildMemberAdd, member => {
 client.on(Events.GuildMemberRemove, member => {
   if (member.guild.id === GUILD_ID && !member.user.bot) schedule();
 });
-client.on(Events.GuildMemberUpdate, (previous, member) => {
+client.on(Events.GuildMemberUpdate, async (previous, member) => {
+  if (member.guild.id !== GUILD_ID) return;
   const config = settings();
+  try { await cycleRemovedRole(previous, member, config); }
+  catch (error) { console.error('Role cycle:', error.message); return; }
   if (member.guild.id === GUILD_ID && (isFormerMember(previous, config) !== isFormerMember(member, config)
       || isClanLeader(previous, config) !== isClanLeader(member, config)
       || previous.roles.cache.has(config.memberRoleId) !== member.roles.cache.has(config.memberRoleId))) schedule();

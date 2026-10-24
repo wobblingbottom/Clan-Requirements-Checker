@@ -5,9 +5,33 @@ import { isFormerMember, isClanLeader } from './configuration.js';
 export { isAsylumStaff } from './configuration.js';
 const excludesMemberRole = (member, settings) => isFormerMember(member, settings) || isClanLeader(member, settings);
 
+const transitioning = new Set();
+
+export async function cycleRemovedRole(previous, member, settings) {
+  if (member.user.bot || isClanLeader(member, settings)) return;
+  const cycle = [settings.memberRoleId, settings.formerMemberRoleId, settings.visitorRoleId];
+  // Ignore role swaps and cleanup events when another status role is present.
+  if (cycle.some(id => id && member.roles.cache.has(id))) return;
+  const removed = cycle.findIndex(id => id && previous.roles.cache.has(id));
+  if (removed < 0 || !cycle[(removed + 1) % cycle.length]) return;
+  const key = member.guild.id + ':' + member.id;
+  if (transitioning.has(key)) return;
+  transitioning.add(key);
+  try {
+    const id = cycle[(removed + 1) % cycle.length];
+    const role = await member.guild.roles.fetch(id);
+    if (!role || role.managed || !role.editable || role.id === member.guild.id
+        || role.permissions.has(PermissionFlagsBits.Administrator) || role.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      throw new Error('Role cycle needs normal assignable roles below the bot role.');
+    }
+    await member.roles.add(id, 'Advance Patient / Patient No More / Visitor role cycle');
+  } finally { transitioning.delete(key); }
+}
+
 export async function assignMemberRoles(guild, settings) {
   const members = await fetchMembers(guild);
   const candidates = [...members.values()].filter(member => !member.user.bot
+    && !transitioning.has(guild.id + ':' + member.id)
     && excludesMemberRole(member, settings) === member.roles.cache.has(settings.memberRoleId));
   const errors = [];
   if (!candidates.length) return { members, errors };

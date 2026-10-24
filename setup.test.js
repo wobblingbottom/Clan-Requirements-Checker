@@ -142,3 +142,19 @@ test('changing vacation channel creates a notice there and persists its new loca
   assert.equal(typeof calls[0], 'object');
   assert.deepEqual(store.data.vacationPanel, { channelId: channel.id, messageId: 'new-notice' });
 });
+
+test('Visitor role is selectable in Setup, displayed and saved', () => {
+  const sessions = new SetupSessions();
+  const store = { data: { requests: {} }, save() {} };
+  const session = sessions.open('admin', 'guild', store.data);
+  sessions.selectField(session, 'visitorRoleId');
+  const initial = setupView(session);
+  assert.ok(initial.components[0].toJSON().components[0].options.some(option => option.value === 'visitorRoleId' && option.label === 'Visitor role'));
+  const visitorId = '88888888888888888';
+  sessions.selectValues(session, [visitorId]);
+  const view = setupView(session);
+  assert.equal(view.embeds[0].toJSON().fields.find(field => field.name === 'Visitor role').value, `<@&${visitorId}>`);
+  assert.deepEqual(view.components[1].toJSON().components[0].default_values, [{ id: visitorId, type: 'role' }]);
+  saveSettings(store, session.draft, session.revision);
+  assert.equal(getSettings(store.data).visitorRoleId, visitorId);
+});
