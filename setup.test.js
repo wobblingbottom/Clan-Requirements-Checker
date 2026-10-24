@@ -21,7 +21,7 @@ const setupInteraction = { guildId: 'guild', commandName: 'clan', options: { get
 function guildFixture(settings = chosen()) {
   const guild = { id: 'guild', members: { fetchMe: async () => ({ permissions: admin }) },
     channels: { fetch: async id => ({ id, guildId: 'guild', type: ChannelType.GuildText, permissionsFor: () => admin }) },
-    roles: { fetch: async id => ({ id, guild: { id: 'guild' }, managed: false }) } };
+    roles: { fetch: async id => ({ id, guild: { id: 'guild' }, managed: false, editable: true }) } };
   return guild;
 }
 
@@ -158,4 +158,16 @@ test('Visitor role is selectable in Setup, displayed and saved', () => {
   assert.deepEqual(view.components[1].toJSON().components[0].default_values, [{ id: visitorId, type: 'role' }]);
   saveSettings(store, session.draft, session.revision);
   assert.equal(getSettings(store.data).visitorRoleId, visitorId);
+});
+
+test('Setup explains missing membership role permissions and hierarchy', async () => {
+  const config = { ...chosen(), formerMemberRoleId: '88888888888888888', visitorRoleId: '99999999999999999' };
+  for (const id of [config.memberRoleId, config.formerMemberRoleId, config.visitorRoleId]) {
+    const guild = guildFixture(config);
+    guild.roles.fetch = async roleId => ({ id: roleId, name: 'Selected role', guild: { id: 'guild' }, editable: roleId !== id });
+    await assert.rejects(validateSettings(guild, config), /above Selected role/);
+  }
+  const guild = guildFixture(config);
+  guild.members.fetchMe = async () => ({ permissions: new PermissionsBitField(PermissionFlagsBits.ManageNicknames) });
+  await assert.rejects(validateSettings(guild, config), /Manage Roles/);
 });

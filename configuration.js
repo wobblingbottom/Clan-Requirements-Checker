@@ -75,11 +75,17 @@ export async function validateSettings(guild, settings) {
     }
     channels[key] = channel;
   }
+  const membershipRoles = [];
   for (const roleId of new Set([...requestRoleIds(settings), ...[settings.formerMemberRoleId, settings.visitorRoleId].filter(Boolean)])) {
     const role = await guild.roles.fetch(roleId);
     if (!role || role.guild.id !== guild.id || role.id === guild.id || role.managed) {
       throw new Error('Choose member and leadership roles from this server; everyone and bot-managed roles are not supported.');
     }
+    if ([settings.memberRoleId, settings.formerMemberRoleId, settings.visitorRoleId].includes(roleId)) membershipRoles.push(role);
+  }
+  if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) throw new Error('Bot needs Manage Roles to switch membership roles.');
+  for (const role of membershipRoles) {
+    if (!role.editable) throw new Error(`Place the bot highest role above ${role.name || role.id} so it can remove conflicting membership roles.`);
   }
   if (!me.permissions.has(PermissionFlagsBits.ManageNicknames)) throw new Error('Bot needs Manage Nicknames permission.');
   return channels;

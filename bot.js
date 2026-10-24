@@ -215,7 +215,7 @@ client.on(Events.GuildMemberUpdate, async (previous, member) => {
   if (member.guild.id !== GUILD_ID) return;
   const config = settings();
   try { await reconcileMembershipRoles(previous, member, config); }
-  catch (error) { console.error('Membership roles:', error.message); return; }
+  catch (error) { console.error('Membership roles for ' + member.id + ':', error.message); schedule(); return; }
   if (member.guild.id === GUILD_ID && (isFormerMember(previous, config) !== isFormerMember(member, config)
       || isClanLeader(previous, config) !== isClanLeader(member, config)
       || previous.roles.cache.has(config.memberRoleId) !== member.roles.cache.has(config.memberRoleId))) schedule();
